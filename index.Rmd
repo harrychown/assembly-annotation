@@ -1,0 +1,228 @@
+---
+title: "Genome Assembly and Annotation"
+author: "Harry Chown"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    highlight: pygments
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction to genome assembly and annotation
+
+
+
+## Caveats
+
+The aim of this tutorial is teach you the process of assembling and annotating your first fungal genome. The methodology outlined below has been specifically designed to annotate the genome of *A. fumigatus* isolates. Modifications to this tutorial will enable genome analyses of alternative fungal organisms, but please do ensure to read the original software documentation to identify where those changes will be required. I will attempt to notify any specific parameters that I use for *A. fumigatus* but I may have missed some.
+
+Additionally, this tutorial may change over time to include assembling from various sequencing platforms and incorporation of new analysis tools. However, older versions will be available through releases.
+
+Furthermore, the code and scripts outlined in this tutorial has been design for use on ICL HPC systems. They follow a simple format of job scripts which can be deployed on this system. Installation guidance is also provided to help members of ICL install the relevant tools on this system. This may mean that this is not 100% transferable to the system you are working on. In addition to this, folder structure will be relevant to members working within Matthew Fisher's group, so check and update the relevant file/folder paths when required. Please seek guidance elsewhere if installation and running of tools fails when used on your relevant system.
+
+## Demonstration data
+
+### Short-read data
+Paired-end short-read sequence data derived from *A. fumigatus* strain CEA10 using NextSeq 500 under the accession [SRR12849133](https://trace.ncbi.nlm.nih.gov/Traces/?run=SRR12849133). Members of FisherLab can find data at ```~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_*.fastq.gz```
+
+### ONT long-read data
+Long-read sequence data derived from *A. fumigatus* strain CEA10 using ONT under the accession [SRR28036069](https://trace.ncbi.nlm.nih.gov/Traces/?run=SRR28036069). Members of FisherLab can find data at ```~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz```
+
+# Read quality control (QC)
+
+## What is inside a FASTQ file?
+
+### Compression
+
+## Long-read QC
+We are going to generate a conda environment called ```ont-qc``` which contains three tools in order to assess the quality of ONT reads, trim and filter. The three tools are:
+
+* NanoQC - visualise quality
+  + Version: 0.10.0
+  + [GitHub](https://github.com/wdecoster/nanoQC) 
+  + [Paper](https://doi.org/10.1093/bioinformatics/bty149)
+* NanoFilt - filter reads
+  + Version: 2.8.0
+  + [GitHub](https://github.com/wdecoster/nanofilt)
+  + [Paper](https://doi.org/10.1093/bioinformatics/bty149) (same as NanoQC)
+* porechop - trim reads
+  + Version: 0.2.4
+  + [GitHub](https://github.com/rrwick/Porechop)
+  + [Paper](https://doi.org/10.1099/mgen.0.000132)
+
+Installation:
+```
+conda create -n ont-qc bioconda::nanoqc bioconda::porechop bioconda::nanofilt
+```
+
+Usage:
+```bash {.numberLines}
+INPUT=~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz
+QC_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/ONT_assembly
+conda activate ont-qc
+# Initial QC
+mkdir -p $QC_DIR/initial_QC
+nanoQC -o $QC_DIR/initial_QC $INPUT
+gunzip -c $INPUT > SRR28036069.fastq
+# Read trimming and filtering
+porechop -i SRR28036069.fastq -t 2 --format fastq | NanoFilt -q 10 -l 500  > $QC_DIR/SRR28036069.trimmed.fastq
+# Post-filter QC
+mkdir -p $QC_DIR/post_QC
+nanoQC -o $QC_DIR/post_QC
+```
+**Lines 1 and 2** set the desired input files and output directory. **Line 9** trims using porechop's default settings and filters based on average read quality >10 or length <500bp. We assess quality both before and after filtering to see the steps in action.
+
+
+
+# Assembly
+
+## Long-read assembly
+
+### ONT assembly
+
+#### Initial assembly
+We are going to use a single tool to generate our initial genome assembly:
+* Flye - long-read assembler
+  + Version: 2.9.6-b1802
+  + [GitHub](https://github.com/mikolmogorov/Flye/tree/flye) 
+  + [Paper](https://doi.org/10.1038/s41587-019-0072-8)
+  
+Installation:
+```
+conda create -n flye bioconda::flye
+```
+  
+```bash {.numberLines}
+INPUT=/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq
+ASM_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye
+mkdir $ASM_DIR
+conda activate flye
+# Initial assembly
+flye --nano-hq $INPUT -o $ASM_DIR --threads 10
+```
+
+
+### Improvement with short-read data
+Tools for alignment, indexing and polishing:
+* Minimap2 - sequence alignment
+  + Version: 2.30-r1287
+  + [GitHub](https://github.com/lh3/minimap2) 
+  + [Paper](https://doi.org/10.1093/bioinformatics/bty191)
+* SAMtools - alignment manipulation
+  + Version: 1.23
+  + [GitHub](https://github.com/samtools/samtools) 
+  + [Paper](https://doi.org/10.1093/gigascience/giab008)
+* Pilon - genome polisher
+  + Version: 1.24
+  + [GitHub](https://github.com/broadinstitute/pilon) 
+  + [Paper](https://doi.org/10.1038/s41587-019-0072-8)
+  
+Installation:
+```
+cd ~/../projects/fisher-local-software/live
+mkdir pilon
+cd pilon
+wget https://github.com/broadinstitute/pilon/releases/download/v1.24/pilon-1.24.jar
+
+conda create -n polish bioconda::minimap2 bioconda::samtools
+```
+  
+```bash {.numberLines}
+GENOME=~/../projects/fisher-aspergillus-reference/live/CEA10.fasta
+R1=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz
+R2=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz
+POLISH_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish
+mkdir $POLISH_DIR
+conda activate polish
+cp $GENOME ./tmp.fasta
+minimap2 -ax sr tmp.fasta $R1 $R2 | samtools sort -T tmp -o output.sorted.bam
+samtools index output.sorted.bam
+
+pilon --genome tmp.fasta --frags output.sorted.bam --Xmx 100g  --threads 10 --outdir $POLISH_DIR
+```
+
+# Assembly QC
+Tools for quality control of assemblies:
+* BBTools/BBMap - sequence analysis
+  + Version: 2.30-r1287
+  + [GitHub](https://github.com/bbushnell/BBTools) 
+  + [Paper](https://doi.org/10.1093/bioinformatics/bty191)
+* BUSCO - alignment manipulation
+  + Version: 1.23
+  + [GitHub](https://github.com/samtools/samtools) 
+  + [Paper](https://doi.org/10.1093/gigascience/giab008)
+* QualiMap - genome polisher
+  + Version: 1.24
+  + [GitHub](https://github.com/broadinstitute/pilon) 
+  + [Paper](https://doi.org/10.1038/s41587-019-0072-8)
+* Minimap2 - see above
+* SAMtools - see above
+
+Installation:
+We will also be using minimap2 and samtools which can be found in the ```polish``` Conda environment. Installation is outlined above.
+Additionally, we will be running an offline BUSCO search using the appropriate database (euortiales) for *A. fumigatus*. Details on downloading the appropriate BUSCO database can be found at: <https://busco.ezlab.org/>.
+```
+conda create -n asm-qc bioconda::bbmap bioconda::busco=6.0.0 bioconda::sepp=4.5.5 bioconda::qualimap
+```
+
+Usage (long-reads only):
+Note: if assembling an organism that is not part of the *Aspergilli* you may need to update the BUSCO database; if running on an alternative machine you will need to change to the appropriate download path
+```
+#BUSCO Complete	| BUSCO Single |	BUSCO Duplicate	 | BUSCO Fragmented | 	BUSCO Missing	| BUSCO Num Genes
+
+#CONTIG COUNT	TOTAL LENGTH	MIN	MAX	MEDIAN	MEAN	L50	N50	L90	N90	GC%
+conda activate asm-qc
+
+stats.sh $GENOME format=2 > $OUTDIR/asm_stats.txt
+
+
+busco -m genome -i $GENOME -o $PREFIX --out_path -l eurotiales_odb10 --offline --download_path ~/../projects/fisher-local-software/live/busco_downloads -f -c 10 
+
+conda activate polish
+minimap2 -a -x map-ont $GENOME $ONT | samtools sort -T tmp -o output.sorted.bam
+samtools index output.sorted.bam
+
+qualimap bamqc -nt 10 -bam output.sorted.bam -outdir $OUTDIR/qualimap
+COV=$(cat $OUTDIR/genome.results.txt | grep "mean coverageData" | cut -d"=" -f2 | sed 's/ //g' | sed 's/X//g')
+
+```
+
+BUSCO
+Read alignment and coverage calling
+
+# Assembly visualisation
+Bandage
+
+# Basic gene prediction
+Installation:
+```
+conda create -n funannotate bioconda::funannotate "python>=3.6,<3.9"
+
+```
+
+Funannotate
+```
+funannotate predict -i genome.fa -s "Aspergillus fumigatus" -o output --protein_evidence $FUNANNOTATE_DB/uniprot_sprot.fasta
+```
+
+# Annotating methylation sites from ONT data
+Installation:
+```
+cd ~/../projects/fisher-local-software/live
+curl "https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-x64.tar.gz" -o dorado-1.3.0-linux-x64.tar.gz
+tar -xzf dorado-1.3.0-linux-x64.tar.gz
+~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado --version
+
+conda create -n ont-meth bioconda::ont-modkit 
+```
+Usage:
+```
+# Align reads then combine
+dorado aligner <draft.fasta> <unmapped_reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
+```
