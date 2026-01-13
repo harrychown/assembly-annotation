@@ -11,7 +11,7 @@
 
 <meta name="author" content="Harry Chown" />
 
-<meta name="date" content="2026-01-12" />
+<meta name="date" content="2026-01-13" />
 
 <title>Genome Assembly and Annotation</title>
 
@@ -1553,7 +1553,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Genome Assembly and Annotation</h1>
 <h4 class="author">Harry Chown</h4>
-<h4 class="date">2026-01-12</h4>
+<h4 class="date">2026-01-13</h4>
 
 </div>
 
@@ -1591,26 +1591,20 @@ on your relevant system.</p>
 <h3>Short-read data</h3>
 <p>Paired-end short-read sequence data derived from <em>A.
 fumigatus</em> strain CEA10 using NextSeq 500 under the accession <a href="https://trace.ncbi.nlm.nih.gov/Traces/?run=SRR12849133">SRR12849133</a>.
-Members of FisherLab can find data at
-<code>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_*.fastq.gz</code></p>
+Members of FisherLab can find data at:</p>
+<pre><code>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_*.fastq.gz</code></pre>
 </div>
 <div id="ont-long-read-data" class="section level3">
 <h3>ONT long-read data</h3>
 <p>Long-read sequence data derived from <em>A. fumigatus</em> strain
 CEA10 using ONT under the accession <a href="https://trace.ncbi.nlm.nih.gov/Traces/?run=SRR28036069">SRR28036069</a>.
-Members of FisherLab can find data at
-<code>~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz</code></p>
+Members of FisherLab can find data at:</p>
+<pre><code>~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz</code></pre>
 </div>
 </div>
 </div>
 <div id="read-quality-control-qc" class="section level1">
 <h1>Read quality control (QC)</h1>
-<div id="what-is-inside-a-fastq-file" class="section level2">
-<h2>What is inside a FASTQ file?</h2>
-<div id="compression" class="section level3">
-<h3>Compression</h3>
-</div>
-</div>
 <div id="long-read-qc" class="section level2">
 <h2>Long-read QC</h2>
 <p>We are going to generate a conda environment called
@@ -1639,24 +1633,48 @@ quality of ONT reads, trim and filter. The three tools are:</p>
 </ul>
 <p>Installation:</p>
 <pre><code>conda create -n ont-qc bioconda::nanoqc bioconda::porechop bioconda::nanofilt</code></pre>
+<p>Script containing ONT read QC analysis can be found under:</p>
+<pre><code>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_qc.job</code></pre>
 <p>Usage:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1"></a><span class="va">INPUT</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz</span>
-<span id="cb2-2"><a href="#cb2-2"></a><span class="va">QC_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/ONT_assembly</span>
-<span id="cb2-3"><a href="#cb2-3"></a><span class="ex">conda</span> activate ont-qc</span>
-<span id="cb2-4"><a href="#cb2-4"></a><span class="co"># Initial QC</span></span>
-<span id="cb2-5"><a href="#cb2-5"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$QC_DIR</span>/initial_QC</span>
-<span id="cb2-6"><a href="#cb2-6"></a><span class="ex">nanoQC</span> <span class="at">-o</span> <span class="va">$QC_DIR</span>/initial_QC <span class="va">$INPUT</span></span>
-<span id="cb2-7"><a href="#cb2-7"></a><span class="fu">gunzip</span> <span class="at">-c</span> <span class="va">$INPUT</span> <span class="op">&gt;</span> SRR28036069.fastq</span>
-<span id="cb2-8"><a href="#cb2-8"></a><span class="co"># Read trimming and filtering</span></span>
-<span id="cb2-9"><a href="#cb2-9"></a><span class="ex">porechop</span> <span class="at">-i</span> SRR28036069.fastq <span class="at">-t</span> 2 <span class="at">--format</span> fastq <span class="kw">|</span> <span class="ex">NanoFilt</span> <span class="at">-q</span> 10 <span class="at">-l</span> 500  <span class="op">&gt;</span> <span class="va">$QC_DIR</span>/SRR28036069.trimmed.fastq</span>
-<span id="cb2-10"><a href="#cb2-10"></a><span class="co"># Post-filter QC</span></span>
-<span id="cb2-11"><a href="#cb2-11"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$QC_DIR</span>/post_QC</span>
-<span id="cb2-12"><a href="#cb2-12"></a><span class="ex">nanoQC</span> <span class="at">-o</span> <span class="va">$QC_DIR</span>/post_QC</span></code></pre></div>
-<p><strong>Lines 1 and 2</strong> set the desired input files and output
-directory. <strong>Line 9</strong> trims using porechop’s default
-settings and filters based on average read quality &gt;10 or length
-&lt;500bp. We assess quality both before and after filtering to see the
-steps in action.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a><span class="co">#PBS -l walltime=00:40:00</span></span>
+<span id="cb5-3"><a href="#cb5-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=100gb</span></span>
+<span id="cb5-4"><a href="#cb5-4"></a><span class="co">#PBS -N zONT_qc</span></span>
+<span id="cb5-5"><a href="#cb5-5"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-6"><a href="#cb5-6"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb5-7"><a href="#cb5-7"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-8"><a href="#cb5-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-10"><a href="#cb5-10"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb5-11"><a href="#cb5-11"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-12"><a href="#cb5-12"></a><span class="va">INPUT</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz</span>
+<span id="cb5-13"><a href="#cb5-13"></a><span class="va">QC_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data</span>
+<span id="cb5-14"><a href="#cb5-14"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-15"><a href="#cb5-15"></a><span class="co"># 3. QC long-reads</span></span>
+<span id="cb5-16"><a href="#cb5-16"></a><span class="co">#CPU Time used: 02:54:36</span></span>
+<span id="cb5-17"><a href="#cb5-17"></a><span class="co">#CPU Percent: 975%</span></span>
+<span id="cb5-18"><a href="#cb5-18"></a><span class="co">#Memory usage: 6260156kb</span></span>
+<span id="cb5-19"><a href="#cb5-19"></a><span class="co">#Approx Power usage: 0.0348</span></span>
+<span id="cb5-20"><a href="#cb5-20"></a><span class="co">#Walltime usage: 00:29:40</span></span>
+<span id="cb5-21"><a href="#cb5-21"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb5-22"><a href="#cb5-22"></a><span class="ex">conda</span> activate ont-qc</span>
+<span id="cb5-23"><a href="#cb5-23"></a><span class="co"># Initial QC</span></span>
+<span id="cb5-24"><a href="#cb5-24"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
+<span id="cb5-25"><a href="#cb5-25"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$QC_DIR</span>/ONT/initial_QC</span>
+<span id="cb5-26"><a href="#cb5-26"></a><span class="ex">nanoQC</span> <span class="at">-o</span> <span class="va">$QC_DIR</span>/ONT/initial_QC <span class="va">$INPUT</span></span>
+<span id="cb5-27"><a href="#cb5-27"></a><span class="fu">gunzip</span> <span class="at">-c</span> <span class="va">$INPUT</span> <span class="op">&gt;</span> SRR28036069.fastq</span>
+<span id="cb5-28"><a href="#cb5-28"></a><span class="co"># Read trimming and filtering</span></span>
+<span id="cb5-29"><a href="#cb5-29"></a><span class="ex">porechop</span> <span class="at">-i</span> SRR28036069.fastq <span class="at">-t</span> 10 <span class="at">--format</span> fastq <span class="kw">|</span> <span class="ex">NanoFilt</span> <span class="at">-q</span> 10 <span class="at">-l</span> 500  <span class="op">&gt;</span> <span class="va">$QC_DIR</span>/ONT/SRR28036069.trimmed.fastq</span>
+<span id="cb5-30"><a href="#cb5-30"></a><span class="co"># Post-filter QC</span></span>
+<span id="cb5-31"><a href="#cb5-31"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$QC_DIR</span>/ONT/post_QC</span>
+<span id="cb5-32"><a href="#cb5-32"></a><span class="ex">nanoQC</span> <span class="at">-o</span> <span class="va">$QC_DIR</span>/ONT/post_QC <span class="va">$QC_DIR</span>/ONT/SRR28036069.trimmed.fastq</span></code></pre></div>
+<p><strong>Lines 12 and 13</strong> set the desired input files and
+output directory.</p>
+<p><strong>Lines 26 and 32</strong> run a visualse QC on reads before
+and after filtering, respectively</p>
+<p><strong>Line 29</strong> trims using porechop’s default settings and
+filters (NanoFilt) based on average read quality &gt;10 or length
+&lt;500bp.</p>
 </div>
 </div>
 <div id="assembly" class="section level1">
@@ -1668,58 +1686,177 @@ steps in action.</p>
 <div id="initial-assembly" class="section level4">
 <h4>Initial assembly</h4>
 <p>We are going to use a single tool to generate our initial genome
-assembly: * Flye - long-read assembler + Version: 2.9.6-b1802 + <a href="https://github.com/mikolmogorov/Flye/tree/flye">GitHub</a> + <a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a></p>
+assembly:</p>
+<ul>
+<li>Flye - long-read assembler
+<ul>
+<li>Version: 2.9.6-b1802</li>
+<li><a href="https://github.com/mikolmogorov/Flye/tree/flye">GitHub</a></li>
+<li><a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a></li>
+</ul></li>
+</ul>
 <p>Installation:</p>
 <pre><code>conda create -n flye bioconda::flye</code></pre>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1"></a><span class="va">INPUT</span><span class="op">=</span>/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq</span>
-<span id="cb4-2"><a href="#cb4-2"></a><span class="va">ASM_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye</span>
-<span id="cb4-3"><a href="#cb4-3"></a><span class="fu">mkdir</span> <span class="va">$ASM_DIR</span></span>
-<span id="cb4-4"><a href="#cb4-4"></a><span class="ex">conda</span> activate flye</span>
-<span id="cb4-5"><a href="#cb4-5"></a><span class="co"># Initial assembly</span></span>
-<span id="cb4-6"><a href="#cb4-6"></a><span class="ex">flye</span> <span class="at">--nano-hq</span> <span class="va">$INPUT</span> <span class="at">-o</span> <span class="va">$ASM_DIR</span> <span class="at">--threads</span> 10</span></code></pre></div>
+<p>Script containing ONT read initial assembly can be found under:
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_asm.job</p>
+<p>Usage:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb7-2"><a href="#cb7-2"></a><span class="co">#PBS -l walltime=00:40:00</span></span>
+<span id="cb7-3"><a href="#cb7-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=100gb</span></span>
+<span id="cb7-4"><a href="#cb7-4"></a><span class="co">#PBS -N zONT_asm</span></span>
+<span id="cb7-5"><a href="#cb7-5"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-6"><a href="#cb7-6"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb7-7"><a href="#cb7-7"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-8"><a href="#cb7-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-10"><a href="#cb7-10"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb7-11"><a href="#cb7-11"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-12"><a href="#cb7-12"></a><span class="va">INPUT</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq</span>
+<span id="cb7-13"><a href="#cb7-13"></a><span class="va">ASM_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye</span>
+<span id="cb7-14"><a href="#cb7-14"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-15"><a href="#cb7-15"></a><span class="co"># 3. Assemble ONT reads</span></span>
+<span id="cb7-16"><a href="#cb7-16"></a><span class="co"># CPU Time used: 01:32:43</span></span>
+<span id="cb7-17"><a href="#cb7-17"></a><span class="co"># CPU Percent: 968%</span></span>
+<span id="cb7-18"><a href="#cb7-18"></a><span class="co"># Memory usage: 10680116kb</span></span>
+<span id="cb7-19"><a href="#cb7-19"></a><span class="co"># Approx Power usage: 0.0184</span></span>
+<span id="cb7-20"><a href="#cb7-20"></a><span class="co"># Walltime usage: 00:14:19</span></span>
+<span id="cb7-21"><a href="#cb7-21"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb7-22"><a href="#cb7-22"></a><span class="fu">mkdir</span> <span class="va">$ASM_DIR</span></span>
+<span id="cb7-23"><a href="#cb7-23"></a><span class="ex">conda</span> activate flye</span>
+<span id="cb7-24"><a href="#cb7-24"></a><span class="co"># Initial assembly</span></span>
+<span id="cb7-25"><a href="#cb7-25"></a><span class="ex">flye</span> <span class="at">--nano-hq</span> <span class="va">$INPUT</span> <span class="at">-o</span> <span class="va">$ASM_DIR</span> <span class="at">--threads</span> 10</span></code></pre></div>
+<p><strong>Line 25</strong> assemble long-reads</p>
 </div>
 </div>
 <div id="improvement-with-short-read-data" class="section level3">
 <h3>Improvement with short-read data</h3>
-<p>Tools for alignment, indexing and polishing: * Minimap2 - sequence
-alignment + Version: 2.30-r1287 + <a href="https://github.com/lh3/minimap2">GitHub</a> + <a href="https://doi.org/10.1093/bioinformatics/bty191">Paper</a> *
-SAMtools - alignment manipulation + Version: 1.23 + <a href="https://github.com/samtools/samtools">GitHub</a> + <a href="https://doi.org/10.1093/gigascience/giab008">Paper</a> * Pilon -
-genome polisher + Version: 1.24 + <a href="https://github.com/broadinstitute/pilon">GitHub</a> + <a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a></p>
+<p>Tools for alignment, indexing and polishing:</p>
+<ul>
+<li>Minimap2 - sequence alignment
+<ul>
+<li>Version: 2.30-r1287</li>
+<li><a href="https://github.com/lh3/minimap2">GitHub</a></li>
+<li><a href="https://doi.org/10.1093/bioinformatics/bty191">Paper</a></li>
+</ul></li>
+<li>SAMtools - alignment manipulation
+<ul>
+<li>Version: 1.23</li>
+<li><a href="https://github.com/samtools/samtools">GitHub</a></li>
+<li><a href="https://doi.org/10.1093/gigascience/giab008">Paper</a></li>
+</ul></li>
+<li>Pilon - genome polisher
+<ul>
+<li>Version: 1.24</li>
+<li><a href="https://github.com/broadinstitute/pilon">GitHub</a></li>
+<li><a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a></li>
+</ul></li>
+</ul>
 <p>Installation:</p>
+<pre><code>conda create -n polish bioconda::minimap2 bioconda::samtools</code></pre>
+<p>Additional installation was required for Pilon. <strong>ICL users do
+not need to repeat the following steps.</strong></p>
 <pre><code>cd ~/../projects/fisher-local-software/live
 mkdir pilon
 cd pilon
-wget https://github.com/broadinstitute/pilon/releases/download/v1.24/pilon-1.24.jar
-
-conda create -n polish bioconda::minimap2 bioconda::samtools</code></pre>
-<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1"></a><span class="va">GENOME</span><span class="op">=</span>~/../projects/fisher-aspergillus-reference/live/CEA10.fasta</span>
-<span id="cb6-2"><a href="#cb6-2"></a><span class="va">R1</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz</span>
-<span id="cb6-3"><a href="#cb6-3"></a><span class="va">R2</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz</span>
-<span id="cb6-4"><a href="#cb6-4"></a><span class="va">POLISH_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish</span>
-<span id="cb6-5"><a href="#cb6-5"></a><span class="fu">mkdir</span> <span class="va">$POLISH_DIR</span></span>
-<span id="cb6-6"><a href="#cb6-6"></a><span class="ex">conda</span> activate polish</span>
-<span id="cb6-7"><a href="#cb6-7"></a><span class="fu">cp</span> <span class="va">$GENOME</span> ./tmp.fasta</span>
-<span id="cb6-8"><a href="#cb6-8"></a><span class="ex">minimap2</span> <span class="at">-ax</span> sr tmp.fasta <span class="va">$R1</span> <span class="va">$R2</span> <span class="kw">|</span> <span class="ex">samtools</span> sort <span class="at">-T</span> tmp <span class="at">-o</span> output.sorted.bam</span>
-<span id="cb6-9"><a href="#cb6-9"></a><span class="ex">samtools</span> index output.sorted.bam</span>
-<span id="cb6-10"><a href="#cb6-10"></a></span>
-<span id="cb6-11"><a href="#cb6-11"></a><span class="ex">pilon</span> <span class="at">--genome</span> tmp.fasta <span class="at">--frags</span> output.sorted.bam <span class="at">--Xmx</span> 100g  <span class="at">--threads</span> 10 <span class="at">--outdir</span> <span class="va">$POLISH_DIR</span></span></code></pre></div>
+wget https://github.com/broadinstitute/pilon/releases/download/v1.24/pilon-1.24.jar</code></pre>
+<p>Script containing polishing assemblies with short-read data can be
+found under:
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/polish.job</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb10-2"><a href="#cb10-2"></a><span class="co">#PBS -l walltime=01:00:00</span></span>
+<span id="cb10-3"><a href="#cb10-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=100gb</span></span>
+<span id="cb10-4"><a href="#cb10-4"></a><span class="co">#PBS -N zPolish</span></span>
+<span id="cb10-5"><a href="#cb10-5"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-6"><a href="#cb10-6"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb10-7"><a href="#cb10-7"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-8"><a href="#cb10-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb10-9"><a href="#cb10-9"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-10"><a href="#cb10-10"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb10-11"><a href="#cb10-11"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-12"><a href="#cb10-12"></a><span class="va">GENOME</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye/assembly.fasta</span>
+<span id="cb10-13"><a href="#cb10-13"></a><span class="va">R1</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz</span>
+<span id="cb10-14"><a href="#cb10-14"></a><span class="va">R2</span><span class="op">=</span>~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz</span>
+<span id="cb10-15"><a href="#cb10-15"></a><span class="va">POLISH_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish</span>
+<span id="cb10-16"><a href="#cb10-16"></a></span>
+<span id="cb10-17"><a href="#cb10-17"></a><span class="va">PILON_PATH</span><span class="op">=</span>~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar</span>
+<span id="cb10-18"><a href="#cb10-18"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-19"><a href="#cb10-19"></a><span class="co"># 3. Generate polish rounds</span></span>
+<span id="cb10-20"><a href="#cb10-20"></a><span class="co">#CPU Time used: 00:41:08</span></span>
+<span id="cb10-21"><a href="#cb10-21"></a><span class="co">#CPU Percent: 168%</span></span>
+<span id="cb10-22"><a href="#cb10-22"></a><span class="co">#Memory usage: 12210052kb</span></span>
+<span id="cb10-23"><a href="#cb10-23"></a><span class="co">#Approx Power usage: 0.008199999999999999</span></span>
+<span id="cb10-24"><a href="#cb10-24"></a><span class="co">#Walltime usage: 00:35:53</span></span>
+<span id="cb10-25"><a href="#cb10-25"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb10-26"><a href="#cb10-26"></a><span class="fu">mkdir</span> <span class="va">$POLISH_DIR</span></span>
+<span id="cb10-27"><a href="#cb10-27"></a><span class="ex">conda</span> activate polish</span>
+<span id="cb10-28"><a href="#cb10-28"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
+<span id="cb10-29"><a href="#cb10-29"></a><span class="fu">cp</span> <span class="va">$GENOME</span> ./tmp.fasta</span>
+<span id="cb10-30"><a href="#cb10-30"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="va">$(</span><span class="fu">seq</span> 1 5<span class="va">)</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb10-31"><a href="#cb10-31"></a>    <span class="fu">mkdir</span> pilon_tmp</span>
+<span id="cb10-32"><a href="#cb10-32"></a>    <span class="co"># Align sequence data to genome</span></span>
+<span id="cb10-33"><a href="#cb10-33"></a>    <span class="ex">minimap2</span> <span class="at">-ax</span> sr tmp.fasta <span class="va">$R1</span> <span class="va">$R2</span> <span class="kw">|</span> <span class="ex">samtools</span> sort <span class="at">-o</span> output.sorted.bam</span>
+<span id="cb10-34"><a href="#cb10-34"></a>    <span class="ex">samtools</span> index output.sorted.bam</span>
+<span id="cb10-35"><a href="#cb10-35"></a>    <span class="co"># Use pilon to improve genome based on alignment</span></span>
+<span id="cb10-36"><a href="#cb10-36"></a>    <span class="ex">java</span> <span class="at">-Xmx100G</span> <span class="at">-jar</span> <span class="va">$PILON_PATH</span> <span class="at">--genome</span> tmp.fasta <span class="at">--bam</span> output.sorted.bam <span class="at">--outdir</span> pilon_tmp <span class="at">--changes</span> </span>
+<span id="cb10-37"><a href="#cb10-37"></a>    <span class="co"># Overwrite genome </span></span>
+<span id="cb10-38"><a href="#cb10-38"></a>    <span class="fu">mv</span> pilon_tmp/pilon.fasta tmp.fasta</span>
+<span id="cb10-39"><a href="#cb10-39"></a>    <span class="fu">rm</span> <span class="at">-rf</span> pilon_tmp</span>
+<span id="cb10-40"><a href="#cb10-40"></a><span class="cf">done</span></span>
+<span id="cb10-41"><a href="#cb10-41"></a></span>
+<span id="cb10-42"><a href="#cb10-42"></a><span class="fu">cp</span> tmp.fasta <span class="va">$POLISH_DIR</span>/ont.polished.fasta</span></code></pre></div>
+<p><strong>Lines 30 and 40</strong> establishes a loop to repeat the
+polish 5 times</p>
+<p><strong>Line 33 and 34</strong> aligns reads to the genome, sorts and
+index alignment file</p>
+<p><strong>Line 36</strong> improves the assembly using the mapped
+data</p>
+<p><strong>Lines 38 and 39</strong> overwrites the input file with the
+new output in order to run polishing again</p>
+<p><strong>Line 42</strong> saves the results in the respective output
+directory</p>
 </div>
 </div>
 </div>
 <div id="assembly-qc" class="section level1">
 <h1>Assembly QC</h1>
-<p>Tools for quality control of assemblies: * BBTools/BBMap - sequence
-analysis + Version: 2.30-r1287 + <a href="https://github.com/bbushnell/BBTools">GitHub</a> + <a href="https://doi.org/10.1093/bioinformatics/bty191">Paper</a> * BUSCO -
-alignment manipulation + Version: 1.23 + <a href="https://github.com/samtools/samtools">GitHub</a> + <a href="https://doi.org/10.1093/gigascience/giab008">Paper</a> * QualiMap
-- genome polisher + Version: 1.24 + <a href="https://github.com/broadinstitute/pilon">GitHub</a> + <a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a> * Minimap2 -
-see above * SAMtools - see above</p>
+<p>Tools for quality control of assemblies:</p>
+<ul>
+<li>BBTools/BBMap - sequence analysis
+<ul>
+<li>Version: 2.30-r1287</li>
+<li><a href="https://github.com/bbushnell/BBTools">GitHub</a></li>
+<li><a href="https://doi.org/10.1093/bioinformatics/bty191">Paper</a></li>
+</ul></li>
+<li>We use SeqKit instead
+<ul>
+<li>Version: 2.12.0</li>
+<li><a href="https://github.com/samtools/samtools">GitHub</a></li>
+<li><a href="https://doi.org/10.1093/gigascience/giab008">Paper</a></li>
+</ul></li>
+<li>BUSCO - alignment manipulation
+<ul>
+<li>Version: 1.23</li>
+<li><a href="https://github.com/samtools/samtools">GitHub</a></li>
+<li><a href="https://doi.org/10.1093/gigascience/giab008">Paper</a></li>
+</ul></li>
+<li>QualiMap - genome polisher
+<ul>
+<li>Version: 1.24</li>
+<li><a href="https://github.com/broadinstitute/pilon">GitHub</a></li>
+<li><a href="https://doi.org/10.1038/s41587-019-0072-8">Paper</a></li>
+</ul></li>
+<li>Minimap2 - see above</li>
+<li>SAMtools - see above</li>
+</ul>
 <p>Installation: We will also be using minimap2 and samtools which can
 be found in the <code>polish</code> Conda environment. Installation is
 outlined above. Additionally, we will be running an offline BUSCO search
 using the appropriate database (euortiales) for <em>A. fumigatus</em>.
 Details on downloading the appropriate BUSCO database can be found at:
 <a href="https://busco.ezlab.org/" class="uri">https://busco.ezlab.org/</a>.</p>
-<pre><code>conda create -n asm-qc bioconda::bbmap bioconda::busco=6.0.0 bioconda::sepp=4.5.5 bioconda::qualimap</code></pre>
+<pre><code>conda create -n asm-qc bioconda::bbmap bioconda::busco=6.0.0 bioconda::sepp=4.5.5 bioconda::qualimap bioconda::seqkit
+
+</code></pre>
 <p>Usage (long-reads only): Note: if assembling an organism that is not
 part of the <em>Aspergilli</em> you may need to update the BUSCO
 database; if running on an alternative machine you will need to change
@@ -1750,10 +1887,79 @@ COV=$(cat $OUTDIR/genome.results.txt | grep &quot;mean coverageData&quot; | cut 
 <div id="basic-gene-prediction" class="section level1">
 <h1>Basic gene prediction</h1>
 <p>Installation:</p>
-<pre><code>conda create -n funannotate bioconda::funannotate &quot;python&gt;=3.6,&lt;3.9&quot;
-</code></pre>
+<pre><code>conda create -n funannotate &quot;python&gt;=3.6,&lt;3.9&quot; bioconda::funannotate bioconda::eggnog-mapper
+conda activate funannotate
+funannotate setup -i all -d ~/../projects/fisher-local-db/live/funannotate_db
+
+
+On a local machine download GeneMark-ES/ET/EP and move it to your desired folder from http://topaz.gatech.edu/GeneMark/license_download.cgi
+Once downloaded, update the Perl script shebangs
+cd ~/../projects/fisher-local-software/live/genemark/gmes_linux_64_4
+for file in *.pl
+do
+    sed -i &#39;s|#!/usr/bin/perl|#!/usr/bin/env perl|g&#39; $file
+done
+
+Access to dbCAN and BUSCO outgroups failed therefore we will install all of the remaining databases
+funannotate setup -i merops -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i uniprot -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i pfam -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i repeats -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i go -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i mibig -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i interpro -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i gene2product -f -d ~/../projects/fisher-local-db/live/funannotate_db
+funannotate setup -i busco_outgroups -f -d ~/../projects/fisher-local-db/live/funannotate_db -w
+
+
+cd ~/../projects/fisher-local-db/live/eggnog_db
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.db.gz 
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog_proteins.dmnd.gz 
+wget -c http://eggnog5.embl.de/download/emapperdb-5.0.2/eggnog.taxa.tar.gz 
+
+gunzip eggnog.db.gz 
+gunzip eggnog_proteins.dmnd.gz 
+tar -xvzf eggnog.taxa.tar.gz 
+rm eggnog.taxa.tar.gz 
+
+All Users:
+  You will need to setup the funannotate databases using funannotate setup.
+  The location of these databases on the file system is your decision and the
+  location can be defined using the FUNANNOTATE_DB environmental variable.
+  
+  To set this up in your conda environment you can run the following:
+    echo &quot;export FUNANNOTATE_DB=/your/path&quot; &gt; /rds/general/user/hchown/home/anaconda3/envs/funannotate/etc/conda/activate.d/funannotate.sh
+    echo &quot;unset FUNANNOTATE_DB&quot; &gt; /rds/general/user/hchown/home/anaconda3/envs/funannotate/etc/conda/deactivate.d/funannotate.sh
+  
+  You can then run your database setup using funannotate:
+    funannotate setup -i all
+    
+  Due to licensing restrictions, if you want to use GeneMark-ES/ET, you will need to install manually:
+  download and follow directions at http://topaz.gatech.edu/GeneMark/license_download.cgi
+  ** note you will likely need to change shebang line for all perl scripts:
+    change: #!/usr/bin/perl to #!/usr/bin/env perl
+     
+      
+Mac OSX Users:
+  Augustus and Trinity cannot be properly installed via conda/bioconda at this time. However,
+  they are able to be installed manually using a local copy of GCC (gcc-8 in example below).
+
+  Install augustus using this repo:
+    https://github.com/nextgenusfs/augustus
+  
+  To install Trinity v2.15.2, download the source code and compile using GCC/G++:
+    wget https://github.com/trinityrnaseq/trinityrnaseq/releases/download/Trinity-v2.15.2/trinityrnaseq-v2.15.2.FULL.tar.gz
+    tar xzvf trinityrnaseq-v2.15.2.FULL.tar.gz
+    cd trinityrnaseq-v2.15.2
+    make CC=gcc-8 CXX=g++-8
+    echo &quot;export TRINITY_HOME=/your/path&quot; &gt; /rds/general/user/hchown/home/anaconda3/envs/funannotate/etc/conda/activate.d/trinity.sh
+    echo &quot;unset TRINITY_HOME&quot; &gt; /rds/general/user/hchown/home/anaconda3/envs/funannotate/etc/conda/deactivate.d/trinity.sh    
+
+
+Check for genemark installation</code></pre>
 <p>Funannotate</p>
-<pre><code>funannotate predict -i genome.fa -s &quot;Aspergillus fumigatus&quot; -o output --protein_evidence $FUNANNOTATE_DB/uniprot_sprot.fasta</code></pre>
+<pre><code># As we a
+funannotate predict -i genome.fa -s &quot;Aspergillus fumigatus&quot; -o output --protein_evidence $FUNANNOTATE_DB/uniprot_sprot.fasta</code></pre>
 </div>
 <div id="annotating-methylation-sites-from-ont-data" class="section level1">
 <h1>Annotating methylation sites from ONT data</h1>
@@ -1766,7 +1972,7 @@ tar -xzf dorado-1.3.0-linux-x64.tar.gz
 conda create -n ont-meth bioconda::ont-modkit </code></pre>
 <p>Usage:</p>
 <pre><code># Align reads then combine
-dorado aligner &lt;draft.fasta&gt; &lt;unmapped_reads.bam&gt; | samtools sort --threads &lt;num_threads&gt; &gt; aligned_reads.bam</code></pre>
+~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado aligner &lt;draft.fasta&gt; &lt;unmapped_reads.bam&gt; | samtools sort --threads &lt;num_threads&gt; &gt; aligned_reads.bam</code></pre>
 </div>
 
 
