@@ -60,7 +60,7 @@ Installation:
 ```
 conda create -n ont-qc bioconda::nanoqc bioconda::porechop bioconda::nanofilt
 ```
-Script containing ONT read QC analysis can be found under:
+Script for ONT read QC analysis can be found at:
 ```
 ~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_qc.job
 ```
@@ -94,16 +94,17 @@ mkdir -p $QC_DIR/ONT/initial_QC
 nanoQC -o $QC_DIR/ONT/initial_QC $INPUT
 gunzip -c $INPUT > SRR28036069.fastq
 # Read trimming and filtering
-porechop -i SRR28036069.fastq -t 10 --format fastq | NanoFilt -q 10 -l 500  > $QC_DIR/ONT/SRR28036069.trimmed.fastq
+porechop -i SRR28036069.fastq -t 10 --format fastq | \
+NanoFilt -q 10 -l 500  > $QC_DIR/ONT/SRR28036069.trimmed.fastq
 # Post-filter QC
 mkdir -p $QC_DIR/ONT/post_QC
 nanoQC -o $QC_DIR/ONT/post_QC $QC_DIR/ONT/SRR28036069.trimmed.fastq
 ```
-**Lines 12 and 13** set the desired input files and output directory.
+**Lines 12 and 13** sets the desired input files and output directory.
 
-**Lines 26 and 32** run a visualse QC on reads before and after filtering, respectively
+**Lines 26 and 33** visualse QC on reads before and after filtering, respectively
 
-**Line 29** trims using porechop's default settings and filters (NanoFilt) based on average read quality >10 or length <500bp. 
+**Lines 29 and 30** trims using porechop's default settings and filters (NanoFilt) based on average read quality >10 or length <500bp. 
 
 
 
@@ -125,9 +126,10 @@ Installation:
 ```
 conda create -n flye bioconda::flye
 ```
-
-Script containing ONT read initial assembly can be found under:
+Script for ONT read assembly can be found at:
+```
 ~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_asm.job
+```
 
 Usage:
 ```bash {.numberLines}
@@ -188,10 +190,12 @@ cd pilon
 wget https://github.com/broadinstitute/pilon/releases/download/v1.24/pilon-1.24.jar
 ```
 
-
-Script containing polishing assemblies with short-read data can be found under:
+Script for polishing assemblies with short-read data can be found at:
+```
 ~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/polish.job
+```
 
+Usage:
 ```bash {.numberLines}
 #!/bin/bash
 #PBS -l walltime=01:00:00
@@ -208,7 +212,6 @@ GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotati
 R1=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz
 R2=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz
 POLISH_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish
-
 PILON_PATH=~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar
 #--------------------------------------------
 # 3. Generate polish rounds
@@ -228,7 +231,8 @@ for i in $(seq 1 5); do
 	minimap2 -ax sr tmp.fasta $R1 $R2 | samtools sort -o output.sorted.bam
 	samtools index output.sorted.bam
 	# Use pilon to improve genome based on alignment
-	java -Xmx100G -jar $PILON_PATH --genome tmp.fasta --bam output.sorted.bam --outdir pilon_tmp --changes 
+	java -Xmx100G -jar $PILON_PATH --genome tmp.fasta --bam output.sorted.bam \
+	--outdir pilon_tmp --changes 
 	# Overwrite genome 
 	mv pilon_tmp/pilon.fasta tmp.fasta
 	rm -rf pilon_tmp
@@ -241,7 +245,7 @@ cp tmp.fasta $POLISH_DIR/ont.polished.fasta
 
 **Line 33 and 34** aligns reads to the genome, sorts and index alignment file
 
-**Line 36** improves the assembly using the mapped data
+**Lines 36 and 37** improves the assembly using the mapped data
 
 **Lines 38 and 39** overwrites the input file with the new output in order to run polishing again
 
@@ -250,61 +254,103 @@ cp tmp.fasta $POLISH_DIR/ont.polished.fasta
 # Assembly QC
 Tools for quality control of assemblies:
 
-* BBTools/BBMap - sequence analysis
-  + Version: 2.30-r1287
-  + [GitHub](https://github.com/bbushnell/BBTools) 
-  + [Paper](https://doi.org/10.1093/bioinformatics/bty191)
-* We use SeqKit instead
+* SeqKit - basic genome statistics
   + Version: 2.12.0
-  + [GitHub](https://github.com/samtools/samtools) 
-  + [Paper](https://doi.org/10.1093/gigascience/giab008)
-* BUSCO - alignment manipulation
-  + Version: 1.23
-  + [GitHub](https://github.com/samtools/samtools) 
-  + [Paper](https://doi.org/10.1093/gigascience/giab008)
-* QualiMap - genome polisher
-  + Version: 1.24
-  + [GitHub](https://github.com/broadinstitute/pilon) 
-  + [Paper](https://doi.org/10.1038/s41587-019-0072-8)
-* Minimap2 - see above
-* SAMtools - see above
+  + [GitHub](https://github.com/shenwei356/seqkit) 
+  + [Paper](https://doi.org/10.1002/imt2.191)
+* BUSCO - gene content of near-universal single-copy orthologs
+  + Version: 6.0.0
+  + [Website](https://busco.ezlab.org/) 
+  + [Paper]( https://doi.org/10.1093/nar/gkae987)
+* QualiMap - coverage analyser
+  + Version: 2.3
+  + [Website](http://qualimap.conesalab.org/) 
+  + [Paper]( https://doi.org/10.1093/bioinformatics/btv566)
+* Minimap2, SAMtools - for read alignments to assembly, see details above
 
 Installation:
 We will also be using minimap2 and samtools which can be found in the ```polish``` Conda environment. Installation is outlined above.
-Additionally, we will be running an offline BUSCO search using the appropriate database (euortiales) for *A. fumigatus*. Details on downloading the appropriate BUSCO database can be found at: <https://busco.ezlab.org/>.
+Additionally, we will be running an offline BUSCO search using the appropriate database (eurotiales) for *A. fumigatus*. Details on downloading the appropriate BUSCO database can be found at: <https://busco.ezlab.org/>.
 ```
-conda create -n asm-qc bioconda::bbmap bioconda::busco=6.0.0 bioconda::sepp=4.5.5 bioconda::qualimap bioconda::seqkit
-
-
+conda create -n asm-qc bioconda::busco=6.0.0 bioconda::sepp=4.5.5 bioconda::qualimap bioconda::seqkit
 ```
 
-Usage (long-reads only):
-Note: if assembling an organism that is not part of the *Aspergilli* you may need to update the BUSCO database; if running on an alternative machine you will need to change to the appropriate download path
-```
-#BUSCO Complete	| BUSCO Single |	BUSCO Duplicate	 | BUSCO Fragmented | 	BUSCO Missing	| BUSCO Num Genes
 
-#CONTIG COUNT	TOTAL LENGTH	MIN	MAX	MEDIAN	MEAN	L50	N50	L90	N90	GC%
+Note: if assembling an organism that is not part of the *Aspergilli* you may need to update the BUSCO database; if running on an alternative machine you will need to change to the appropriate download path. Additionally, read mapping is only for long-read sequence data, please see section on polishing to edit Minimap2 for short-read data.
+
+Script for running assembly QC (derived from long-read data) can be found at:
+```
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_asm_qc.job
+```
+
+
+Usage:
+
+```bash {.numberLines}
+#!/bin/bash
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zAsmQC
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish/ont.polished.fasta
+ONT=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq
+BUSCO_DB=~/../projects/fisher-local-software/live/busco_downloads
+ASM_QC_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/asm_QC
+#--------------------------------------------
+# 3. Perform QC on polished assembly
+#--------------------------------------------
+mkdir $ASM_QC_DIR
 conda activate asm-qc
-
-stats.sh $GENOME format=2 > $OUTDIR/asm_stats.txt
-
-
-busco -m genome -i $GENOME -o $PREFIX --out_path -l eurotiales_odb10 --offline --download_path ~/../projects/fisher-local-software/live/busco_downloads -f -c 10 
-
+# Traditional statistics
+seqkit stats -a -N 50,90 $GENOME | sed 's/,//g' > $ASM_QC_DIR/basic_stats.txt
+# Conserved universal orthologs
+cd $TMPDIR
+mkdir busco
+busco -m genome -i $GENOME -o assembly --out_path busco -l eurotiales_odb10 \
+--miniprot --offline \
+--download_path ~/../projects/fisher-local-software/live/busco_downloads \
+-f -c 10
+cp ./busco/assembly/short_summary.specific.eurotiales_odb10.assembly.txt $ASM_QC_DIR/busco.txt
+# Coverage 
+## ONT read mapping
 conda activate polish
 minimap2 -a -x map-ont $GENOME $ONT | samtools sort -T tmp -o output.sorted.bam
 samtools index output.sorted.bam
-
-qualimap bamqc -nt 10 -bam output.sorted.bam -outdir $OUTDIR/qualimap
-COV=$(cat $OUTDIR/genome.results.txt | grep "mean coverageData" | cut -d"=" -f2 | sed 's/ //g' | sed 's/X//g')
-
+## Coverage calc.
+conda activate asm-qc
+mkdir $ASM_QC_DIR/qualimap
+qualimap bamqc -nt 10 -bam output.sorted.bam -outdir $ASM_QC_DIR/qualimap \
+--java-mem-size=80G
+#--------------------------------------------
+# 4. Summarise QC results
+#--------------------------------------------
+#num_seqs sum_len min_len avg_len max_len median GC% N50 N90
+STATS=$(awk '{print $4,$5,$6,$7,$8,$10,$18,$20,$21'} $ASM_QC_DIR/basic_stats.txt \
+| tail -n1 | sed 's/ /,/g')
+#BUSCO Complete	| BUSCO Single |	BUSCO Duplicate	 | BUSCO Fragmented | 	BUSCO Missing	| BUSCO Num Genes
+BUSCO=$(grep "C:" $ASM_QC_DIR/busco.txt | awk '{print $1}' | sed 's/\[/,/g' \
+| sed 's/\]//g' | sed 's/[%|:|Aa-Zz]//g' | cut -d"," -f1-6)
+COV=$(cat $ASM_QC_DIR/qualimap/genome_results.txt | grep "mean coverageData" \
+| cut -d"=" -f2 | sed 's/ //g' | sed 's/X//g')
+echo "${STATS},${COV},${BUSCO}" > $ASM_QC_DIR/overall_stats.csv
 ```
+**Line 22** performs basic calculation of assembly statistics
 
-BUSCO
-Read alignment and coverage calling
+**Lines 26-29** identifies the presence of single-copy conserved orthologs.
+This provides an idea of genome completeness
 
-# Assembly visualisation
-Bandage
+**Lines 33-40** aligns reads to the genome (minimap2, samtools) and calculates
+coverage (qualimap), providing an idea of read-depth
+
+**Lines 45-52** extract formatted information from outputs and saves this as a 
+single comma-separated line. Exact headers are described a combination of 
+**Line 44 + coverage + Line 47**
 
 # Basic gene prediction
 Installation:
