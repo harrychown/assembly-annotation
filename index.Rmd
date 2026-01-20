@@ -396,7 +396,8 @@ Remember this is not a requirement for Fisher Lab members, these steps have alre
 
 First, download databases for Funannotate:
 
-At the time of writing this (Jan. 2025) access to dbCAN databases was not possible and has therefore been omitted.
+**Update:** Original version did not include dbCAN, this has since been changed.
+
 ```
 conda activate funannotate
 funannotate setup -i merops -f -d ~/../projects/fisher-local-db/live/funannotate_db
@@ -408,6 +409,22 @@ funannotate setup -i interpro -f -d ~/../projects/fisher-local-db/live/funannota
 funannotate setup -i gene2product -f -d ~/../projects/fisher-local-db/live/funannotate_db
 funannotate setup -i busco_outgroups -f -d ~/../projects/fisher-local-db/live/funannotate_db -w
 funannotate setup -i repeats -f -d ~/../projects/fisher-local-db/live/funannotate_db -w
+```
+dbCAN failed to install database via funannotate. Therefore, the steps below outline how the database (version 12) was obtained manually:
+```
+conda activate funannotate
+cd ~/../projects/fisher-local-db/live/funannotate_db
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/dbCAN-HMMdb-V12.txt 
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/CAZyDB.08062022.fam-activities.txt
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/readme.txt
+
+mv CAZyDB.08062022.fam-activities.txt dbCAN-fam-HMMs.txt
+mv readme.txt dbCAN.changelog.txt
+
+sed 's/.hmm$//g' dbCAN-HMMdb-V12.txt > dbCAN.hmm
+hmmpress -f dbCAN.hmm
+
+echo -e 'dbCAN\thmmer3\t/rds/general/user/hchown/home/../projects/fisher-local-db/live/funannotate_db/dbCAN.hmm\t11.0\t2022-09-08\t750413\t4e8cafc3eea47ec7ba505bb1e3465d21' >> funannotate-db-info.txt
 ```
 For GeneMark-ES/ET/EP, you'll need to download the tools to a local machine and move it to your desired folder see <http://topaz.gatech.edu/GeneMark/license_download.cgi> .
 Once downloaded, you'll have to update the Perl script shebangs:
@@ -447,7 +464,11 @@ cd ~/../projects/fisher-local-db/live/rfam-15.1
 wget ftp://ftp.ebi.ac.uk/pub/databases/Rfam/15.1/Rfam.cm.gz
 cmpress Rfam.cm 
 ```
-
+There is also a conversion script that takes the table output of Infernal and converts this to GFF. I downloaded ```infernal-tblout2gff.pl``` from <https://github.com/nawrockie/jiffy-infernal-hmmer-scripts> and then placed it inside of the Fisher Lab local software directory.
+```
+cd ~/../projects/fisher-local-software/live
+git clone https://github.com/nawrockie/jiffy-infernal-hmmer-scripts
+```
 
 Usage:
 
@@ -482,7 +503,7 @@ STRAIN=demo
 # 3. Sort and clean contig names
 #--------------------------------------------
 cd $TMPDIR
-rm -rf $ANNOT_DIR
+
 mkdir $ANNOT_DIR
 BASE=$(basename $GENOME)
 conda activate asm-qc
@@ -500,10 +521,9 @@ funannotate mask -i $ANNOT_DIR/sorted.$BASE --cpus 10 -o $ANNOT_DIR/masked.$BASE
 mkdir $ANNOT_DIR/funannotate
 export FUNANNOTATE_DB=$FUNANNOTATE_DB
 export GENEMARK_PATH=$GENEMARK_PATH
-funannotate predict -i $ANNOT_DIR/masked.$BASE -d $FUNANNOTATE_DB -o $ANNOT_DIR/funannotate \
---species "Aspergillus fumigatus" --strain $STRAIN \
---busco_seed_species aspergillus_fumigatus --cpus 10 \
---busco_db $BUSCO_DB --tmpdir $TMPDIR
+funannotate predict -i $ANNOT_DIR/masked.$BASE -d $FUNANNOTATE_DB -o $ANNOT_DIR/funannotate --species "Aspergillus fumigatus" \
+--strain $STRAIN --busco_seed_species aspergillus_fumigatus --cpus 10 --busco_db $BUSCO_DB --tmpdir $TMPDIR
+
 #--------------------------------------------
 # 6. Functional annotation
 # Estimated run time ~4hrs
@@ -511,25 +531,22 @@ funannotate predict -i $ANNOT_DIR/masked.$BASE -d $FUNANNOTATE_DB -o $ANNOT_DIR/
 # InterProScan5
 # Estimated run time 20mins
 mkdir $ANNOT_DIR/interproscan
-~/../projects/fisher-local-software/live/interproscan-5.67-99.0/interproscan.sh -appl Pfam \
---iprlookup -cpu 10 -d $ANNOT_DIR/interproscan --goterms \
--i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
+~/../projects/fisher-local-software/live/interproscan-5.67-99.0/interproscan.sh -appl Pfam --iprlookup -cpu 10 \
+-d $ANNOT_DIR/interproscan --goterms -i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
 
 # Eggnog
 # Estimated run time ~2hrs
 mkdir $ANNOT_DIR/eggnog
 export EGGNOG_DATA_DIR=~/../projects/fisher-local-db/live/eggnog_db
-emapper.py --sensmode very-sensitive --tax_scope Fungi --cpu 10 \
---output_dir $ANNOT_DIR/eggnog -o $STRAIN --override --temp_dir $TMPDIR \
--i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
+emapper.py --sensmode very-sensitive --tax_scope Fungi --cpu 10 --output_dir $ANNOT_DIR/eggnog -o $STRAIN \
+--override --temp_dir $TMPDIR -i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
 
 # antiSMASH
 # Estimated run time 30mins
 conda activate antismash
 mkdir $ANNOT_DIR/antismash
 antismash --taxon fungi --clusterhmmer --tigrfam -c 10 \
---databases ~/../projects/fisher-local-db/live/antismash \
---output-dir $ANNOT_DIR/antismash --no-abort-on-invalid-records -d -v \
+--databases ~/../projects/fisher-local-db/live/antismash --output-dir $ANNOT_DIR/antismash --no-abort-on-invalid-records -d -v \
 --genefinding-tool none \
 "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.gbk"
 
@@ -539,48 +556,81 @@ conda activate infernal
 mkdir $ANNOT_DIR/infernal
 cmscan --rfam -E 0.001 --tblout $ANNOT_DIR/infernal/$STRAIN.cmscan --fmt 1 --cpu 10 \
 ~/../projects/fisher-local-db/live/rfam-15.1/Rfam.cm "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.gbk"
-# dbCAN database is currently down for maintenance and is not possible to run
+~/../projects/fisher-local-software/live/jiffy-infernal-hmmer-scripts/infernal-tblout2gff.pl --cmscan \
+$ANNOT_DIR/infernal/$STRAIN.cmscan > $ANNOT_DIR/infernal/$STRAIN.cmscan.gff
 
 # Combine annotations (except Infernal)
 conda activate funannotate
+export FUNANNOTATE_DB=$FUNANNOTATE_DB
+export BUSCO_DB=~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10
 funannotate annotate -i $ANNOT_DIR/funannotate/predict_results -d $FUNANNOTATE_DB \
 -o $ANNOT_DIR/funannotate --fasta $ANNOT_DIR/masked.$BASE --species "Aspergillus fumigatus" \
---eggnog $ANNOT_DIR/eggnog/$STRAIN.emapper.annotations \
---antismash "${ANNOT_DIR}/antismash/Aspergillus_fumigatus_${STRAIN}.gbk" \
---iprscan "${ANNOT_DIR}/interproscan/Aspergillus_fumigatus_${STRAIN}.proteins.fa.xml" \
---busco_db $BUSCO_DB \
+--eggnog $ANNOT_DIR/eggnog/$STRAIN.emapper.annotations --antismash "${ANNOT_DIR}/antismash/Aspergillus_fumigatus_${STRAIN}.gbk" \
+--iprscan "${ANNOT_DIR}/interproscan/Aspergillus_fumigatus_${STRAIN}.proteins.fa.xml" --busco_db $BUSCO_DB \
 --cpus 10 --tmpdir $TMPDIR
+
 ```
 
 **Line 26** organises the contigs/scaffolds in descending order and renames them as scaffold_1, scaffold_2...scaffold_N
 
 **Line 31** performs soft-masking of repetitive regions. This helps reduces errors and speed-up performances of annotation tools. As a large fraction of the genome is repetitive in eukaryotes, if we filter out low-complexity regions we can focus on coding genes.
 
-**Lines 38-43** run basic prediction of genes, mainly through the use of protein databases. See the Funannotate documentation to see the individual tools which comprise this step.
+**Lines 38-41** run basic prediction of genes, mainly through the use of protein databases. See the Funannotate documentation to see the individual tools which comprise this step.
 
-**Lines 51-53** annotate using InterProScan database of protein domains
+**Lines 50-51** annotate using InterProScan database of protein domains
 
-**Lines 59-61** annotate using related orthologs
+**Lines 57-58** annotate using related orthologs
 
-**Lines 67-71** annotates secondary metabolite gene clusters
+**Lines 64-67** annotates secondary metabolite gene clusters
 
-**Lines 77-78** annotates RNA sequences
+**Lines 73-75** annotates RNA sequences
 
-**Lines 83-89** perform additional annotations and combines results from InterProScan, EggNOG and antiSMASH
+**Line 76** converts Infernal output to GFF
 
-# Annotating methylation sites from ONT data
-Installation:
+
+**Lines 80-86** perform additional annotations and combines results from InterProScan, EggNOG and antiSMASH
+
+# 5mC and 5hmC from ONT
+
+In this example, we are aiming to identify 5mC methylation sites from ONT data. 5mC sites are just one form of epigenetic markers; ONT can sequence alternative markers depending on the software which performs the base-calling, additional markers can be identified if you adapt the code below.
+
+
+Installation (non-/FL):
+```
+conda create -n ont-meth bioconda::ont-modkit 
+```
+
+Installation (non-FL):
+
+Fisher Lab members do not need to carry out these steps
 ```
 cd ~/../projects/fisher-local-software/live
 curl "https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-x64.tar.gz" -o dorado-1.3.0-linux-x64.tar.gz
 tar -xzf dorado-1.3.0-linux-x64.tar.gz
-~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado --version
+```
 
-conda create -n ont-meth bioconda::ont-modkit 
-```
+In this example, we will be using demonstration data generated by an MRes student (Peng Zhou) during their time in Fisher Lab. 
+For non-FL members please adapt the scripts appropriately.
+
+Two scripts have been generated to call 5mC sites. The first, ```01_methAlign.job```, takes unaligned ```.bam``` files and aligns these to their respective genome. This is carried out independently for each file generated for your ONT sample. The second, ```02_methCall.job```, combines these files together, identifies 5mC and 5hmC sites, filters these based on a minimum percentage of modified base calls (75%) and identifies all of the sites, plus those on CpG dinucleotides. Much like variant calling, reads are overlapped onto eachother, this means that a portion of the reads may contain a modified base, whilst others do not, this is due to repetitive nature of DNA and the overlaps generated during assembly. This is why we apply an additional filter on percentage of modified bases.
+
+## Alignment
+
+Tools for aligning ONT BAM files:
+
+* Dorado - ONT toolkit
+  + Version: 1.3.0
+  + [GitHub](https://github.com/nanoporetech/dorado) 
+* SAMtools, see details above
+
 Usage:
-Mapping
+
+Script for aligning BAM files from ONT can be found at:
 ```
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/01_methAlign.job
+```
+
+```bash {.numberLines}
 #!/bin/bash
 #PBS -l walltime=04:00:00
 #PBS -l select=1:ncpus=10:mem=80gb
@@ -605,9 +655,89 @@ conda activate polish
 mkdir -p $BAM_OUTDIR
 ~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado aligner -t 10 $FASTA_DIR/$RUN_ID.ont.polished.fasta $BAM_FILE \
 | samtools sort --threads 10 > $BAM_OUTDIR/$RUN_ID.$PBS_ARRAY_INDEX.aligned_reads.bam
+```
+
+**Lines 23-24** align the ONT BAM file to the genome and sorts the resulting file
+
+## Calling modifications
+
+Tools for aligning ONT BAM files:
+
+* Modkit - ONT epi-marker caller
+  + Version: 1.8.17
+  + [GitHub](https://github.com/nanoporetech/modkit) 
+* SAMtools, see details above
+
+Usage:
+
+Script for calling 5hmC and 5mC from aligned BAM files can be found at:
+```
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/01_methAlign.job
+```
+
+```bash {.numberLines}
+#!/bin/bash
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=10:mem=80gb
+#PBS -N zMethCall
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+BAM_DIR=~/../ephemeral/barcode01/bam
+GENOME=~/../ephemeral/barcode01.ont.polished.fasta
+OUT_DIR=~/../ephemeral
+#--------------------------------------------
+# 3. Combine BAM alignments
+#--------------------------------------------
+cd $TMPDIR
+conda activate polish
+find $BAM_DIR -name "*.bam" -print0 | xargs -0 samtools merge -@ 10 barcode01.merged.bam
+samtools index barcode01.merged.bam
+#--------------------------------------------
+# 4. Sanity check methylation sites
+#--------------------------------------------
+conda activate ont-meth
+modkit modbam summary --filter-threshold 0.79 --no-sampling -t 10 barcode01.merged.bam
+#--------------------------------------------
+# 5. Call methylation sites
+#--------------------------------------------
+modkit pileup \
+barcode01.merged.bam \
+barcode01.meth.bed \
+--modified-bases 5mC 5hmC \
+--reference $GENOME \
+--log ~/../ephemeral/modkit.log.txt \
+-t 10 \
+--filter-threshold 0.79
+# CpG sites only
+modkit pileup \
+barcode01.merged.bam \
+barcode01.meth.cpg.bed \
+--modified-bases 5mC 5hmC \
+--reference $GENOME \
+--log ~/../ephemeral/modkit.log.txt \
+-t 10 --cpg \
+--filter-threshold 0.79
+#------------------------------------------
+# 6. Filter sites
+#-----------------------------------------
+awk -F '\t' '$11 > 75' barcode01.meth.bed > $OUT_DIR/barcode01.filtered.meth.bed
+awk -F '\t' '$11 > 75' barcode01.meth.cpg.bed > $OUT_DIR/barcode01.filtered.meth.cpg.bed
 
 ```
-Merging
-samtools merge -o merged_output.bam input1.bam input2.bam input3.bam
 
-Calling
+**Lines 20-21** merge the individual BAM files from a barcode and indexes the resulting file
+
+**Line 26** prints out a brief summary of the modification profiles
+
+**Lines 30-37** calls 5mC and 5hmC modified bases, filter threshold has been set to 0.79
+
+**Lines 39-46** identifies the 5mC and 5hmC sits that are on CpG islands
+
+**Lines 50-51** filters the calls so that the modified base must appear in more than 75% of the base calls
+
+

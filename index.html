@@ -11,7 +11,7 @@
 
 <meta name="author" content="Harry Chown" />
 
-<meta name="date" content="2026-01-19" />
+<meta name="date" content="2026-01-20" />
 
 <title>Genome Assembly and Annotation</title>
 
@@ -1553,7 +1553,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Genome Assembly and Annotation</h1>
 <h4 class="author">Harry Chown</h4>
-<h4 class="date">2026-01-19</h4>
+<h4 class="date">2026-01-20</h4>
 
 </div>
 
@@ -1984,8 +1984,8 @@ conda create -n infernal bioconda::infernal</code></pre>
 Fisher Lab members, these steps have already been carried out for
 you.</p>
 <p>First, download databases for Funannotate:</p>
-<p>At the time of writing this (Jan. 2025) access to dbCAN databases was
-not possible and has therefore been omitted.</p>
+<p><strong>Update:</strong> Original version did not include dbCAN, this
+has since been changed.</p>
 <pre><code>conda activate funannotate
 funannotate setup -i merops -f -d ~/../projects/fisher-local-db/live/funannotate_db
 funannotate setup -i uniprot -f -d ~/../projects/fisher-local-db/live/funannotate_db
@@ -1996,6 +1996,22 @@ funannotate setup -i interpro -f -d ~/../projects/fisher-local-db/live/funannota
 funannotate setup -i gene2product -f -d ~/../projects/fisher-local-db/live/funannotate_db
 funannotate setup -i busco_outgroups -f -d ~/../projects/fisher-local-db/live/funannotate_db -w
 funannotate setup -i repeats -f -d ~/../projects/fisher-local-db/live/funannotate_db -w</code></pre>
+<p>dbCAN failed to install database via funannotate. Therefore, the
+steps below outline how the database (version 12) was obtained
+manually:</p>
+<pre><code>conda activate funannotate
+cd ~/../projects/fisher-local-db/live/funannotate_db
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/dbCAN-HMMdb-V12.txt 
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/CAZyDB.08062022.fam-activities.txt
+wget http://dbcan-hcc.unl.edu/download/Databases/V12/readme.txt
+
+mv CAZyDB.08062022.fam-activities.txt dbCAN-fam-HMMs.txt
+mv readme.txt dbCAN.changelog.txt
+
+sed &#39;s/.hmm$//g&#39; dbCAN-HMMdb-V12.txt &gt; dbCAN.hmm
+hmmpress -f dbCAN.hmm
+
+echo -e &#39;dbCAN\thmmer3\t/rds/general/user/hchown/home/../projects/fisher-local-db/live/funannotate_db/dbCAN.hmm\t11.0\t2022-09-08\t750413\t4e8cafc3eea47ec7ba505bb1e3465d21&#39; &gt;&gt; funannotate-db-info.txt</code></pre>
 <p>For GeneMark-ES/ET/EP, you’ll need to download the tools to a local
 machine and move it to your desired folder see <a href="http://topaz.gatech.edu/GeneMark/license_download.cgi" class="uri">http://topaz.gatech.edu/GeneMark/license_download.cgi</a> .
 Once downloaded, you’ll have to update the Perl script shebangs:</p>
@@ -2028,6 +2044,13 @@ mkdir ~/../projects/fisher-local-db/live/rfam-15.1
 cd ~/../projects/fisher-local-db/live/rfam-15.1
 wget ftp://ftp.ebi.ac.uk/pub/databases/Rfam/15.1/Rfam.cm.gz
 cmpress Rfam.cm </code></pre>
+<p>There is also a conversion script that takes the table output of
+Infernal and converts this to GFF. I downloaded
+<code>infernal-tblout2gff.pl</code> from <a href="https://github.com/nawrockie/jiffy-infernal-hmmer-scripts" class="uri">https://github.com/nawrockie/jiffy-infernal-hmmer-scripts</a>
+and then placed it inside of the Fisher Lab local software
+directory.</p>
+<pre><code>cd ~/../projects/fisher-local-software/live
+git clone https://github.com/nawrockie/jiffy-infernal-hmmer-scripts</code></pre>
 <p>Usage:</p>
 <p>For your organism of interest, you will need to update
 <code>BUSCO_DB</code> and the seed-/species names in the
@@ -2037,95 +2060,92 @@ Funannotate wiki (above).</p>
 <p>Script for running basic gene prediction and annotation can be found
 at:</p>
 <pre><code>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/annotate.job</code></pre>
-<div class="sourceCode" id="cb23"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1"></a><span class="co">#!/bin/bash</span></span>
-<span id="cb23-2"><a href="#cb23-2"></a><span class="co">#PBS -l walltime=08:00:00</span></span>
-<span id="cb23-3"><a href="#cb23-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=100gb</span></span>
-<span id="cb23-4"><a href="#cb23-4"></a><span class="co">#PBS -N zPredict</span></span>
-<span id="cb23-5"><a href="#cb23-5"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-6"><a href="#cb23-6"></a><span class="co"># 1. Initialise conda</span></span>
-<span id="cb23-7"><a href="#cb23-7"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-8"><a href="#cb23-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
-<span id="cb23-9"><a href="#cb23-9"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-10"><a href="#cb23-10"></a><span class="co"># 2. Establish input/output streams</span></span>
-<span id="cb23-11"><a href="#cb23-11"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-12"><a href="#cb23-12"></a><span class="va">GENOME</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish/ont.polished.fasta</span>
-<span id="cb23-13"><a href="#cb23-13"></a><span class="va">ANNOT_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/annotation</span>
-<span id="cb23-14"><a href="#cb23-14"></a><span class="va">FUNANNOTATE_DB</span><span class="op">=</span>~/../projects/fisher-local-db/live/funannotate_db</span>
-<span id="cb23-15"><a href="#cb23-15"></a><span class="va">BUSCO_DB</span><span class="op">=</span>~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10</span>
-<span id="cb23-16"><a href="#cb23-16"></a><span class="va">GENEMARK_PATH</span><span class="op">=</span>~/../projects/fisher-local-software/live/genemark/gmes_linux_64_4</span>
-<span id="cb23-17"><a href="#cb23-17"></a><span class="va">STRAIN</span><span class="op">=</span>demo</span>
-<span id="cb23-18"><a href="#cb23-18"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-19"><a href="#cb23-19"></a><span class="co"># 3. Sort and clean contig names</span></span>
-<span id="cb23-20"><a href="#cb23-20"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-21"><a href="#cb23-21"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
-<span id="cb23-22"><a href="#cb23-22"></a><span class="fu">rm</span> <span class="at">-rf</span> <span class="va">$ANNOT_DIR</span></span>
-<span id="cb23-23"><a href="#cb23-23"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span></span>
-<span id="cb23-24"><a href="#cb23-24"></a><span class="va">BASE</span><span class="op">=</span><span class="va">$(</span><span class="fu">basename</span> <span class="va">$GENOME)</span></span>
-<span id="cb23-25"><a href="#cb23-25"></a><span class="ex">conda</span> activate asm-qc</span>
-<span id="cb23-26"><a href="#cb23-26"></a><span class="ex">seqkit</span> sort <span class="at">-l</span> <span class="at">-r</span> <span class="va">$GENOME</span> <span class="kw">|</span> <span class="fu">sed</span> <span class="st">&#39;s/&gt;.*/&gt;scaffold/g&#39;</span> <span class="kw">|</span> <span class="ex">seqkit</span> rename <span class="kw">|</span> <span class="fu">sed</span> <span class="st">&#39;s/&gt;scaffold$/&gt;scaffold_1/g&#39;</span>  <span class="op">&gt;</span> <span class="va">$ANNOT_DIR</span>/sorted.<span class="va">$BASE</span></span>
-<span id="cb23-27"><a href="#cb23-27"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-28"><a href="#cb23-28"></a><span class="co"># 4. Mask repetitive regions</span></span>
-<span id="cb23-29"><a href="#cb23-29"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-30"><a href="#cb23-30"></a><span class="ex">conda</span> activate funannotate</span>
-<span id="cb23-31"><a href="#cb23-31"></a><span class="ex">funannotate</span> mask <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/sorted.<span class="va">$BASE</span> <span class="at">--cpus</span> 10 <span class="at">-o</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span></span>
-<span id="cb23-32"><a href="#cb23-32"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-33"><a href="#cb23-33"></a><span class="co"># 5. Predict genes</span></span>
-<span id="cb23-34"><a href="#cb23-34"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-35"><a href="#cb23-35"></a><span class="co"># As we don&#39;t have corresponding RNA-seq data we will use a pre-trained database</span></span>
-<span id="cb23-36"><a href="#cb23-36"></a><span class="co"># Estimated run time ~2hr45mins</span></span>
-<span id="cb23-37"><a href="#cb23-37"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/funannotate</span>
-<span id="cb23-38"><a href="#cb23-38"></a><span class="bu">export</span> <span class="va">FUNANNOTATE_DB</span><span class="op">=</span><span class="va">$FUNANNOTATE_DB</span></span>
-<span id="cb23-39"><a href="#cb23-39"></a><span class="bu">export</span> <span class="va">GENEMARK_PATH</span><span class="op">=</span><span class="va">$GENEMARK_PATH</span></span>
-<span id="cb23-40"><a href="#cb23-40"></a><span class="ex">funannotate</span> predict <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span> <span class="at">-d</span> <span class="va">$FUNANNOTATE_DB</span> <span class="at">-o</span> <span class="va">$ANNOT_DIR</span>/funannotate <span class="dt">\</span></span>
-<span id="cb23-41"><a href="#cb23-41"></a>--species <span class="st">&quot;Aspergillus fumigatus&quot;</span> <span class="at">--strain</span> <span class="va">$STRAIN</span> <span class="dt">\</span></span>
-<span id="cb23-42"><a href="#cb23-42"></a>--busco_seed_species aspergillus_fumigatus <span class="at">--cpus</span> 10 <span class="dt">\</span></span>
-<span id="cb23-43"><a href="#cb23-43"></a>--busco_db <span class="va">$BUSCO_DB</span> <span class="at">--tmpdir</span> <span class="va">$TMPDIR</span></span>
-<span id="cb23-44"><a href="#cb23-44"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-45"><a href="#cb23-45"></a><span class="co"># 6. Functional annotation</span></span>
-<span id="cb23-46"><a href="#cb23-46"></a><span class="co"># Estimated run time ~4hrs</span></span>
-<span id="cb23-47"><a href="#cb23-47"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb23-48"><a href="#cb23-48"></a><span class="co"># InterProScan5</span></span>
-<span id="cb23-49"><a href="#cb23-49"></a><span class="co"># Estimated run time 20mins</span></span>
-<span id="cb23-50"><a href="#cb23-50"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/interproscan</span>
-<span id="cb23-51"><a href="#cb23-51"></a><span class="ex">~/../projects/fisher-local-software/live/interproscan-5.67-99.0/interproscan.sh</span> <span class="at">-appl</span> Pfam <span class="dt">\</span></span>
-<span id="cb23-52"><a href="#cb23-52"></a>--iprlookup <span class="at">-cpu</span> 10 <span class="at">-d</span> <span class="va">$ANNOT_DIR</span>/interproscan <span class="at">--goterms</span> <span class="dt">\</span></span>
-<span id="cb23-53"><a href="#cb23-53"></a>-i <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa&quot;</span></span>
-<span id="cb23-54"><a href="#cb23-54"></a></span>
-<span id="cb23-55"><a href="#cb23-55"></a><span class="co"># Eggnog</span></span>
-<span id="cb23-56"><a href="#cb23-56"></a><span class="co"># Estimated run time ~2hrs</span></span>
-<span id="cb23-57"><a href="#cb23-57"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/eggnog</span>
-<span id="cb23-58"><a href="#cb23-58"></a><span class="bu">export</span> <span class="va">EGGNOG_DATA_DIR</span><span class="op">=</span>~/../projects/fisher-local-db/live/eggnog_db</span>
-<span id="cb23-59"><a href="#cb23-59"></a><span class="ex">emapper.py</span> <span class="at">--sensmode</span> very-sensitive <span class="at">--tax_scope</span> Fungi <span class="at">--cpu</span> 10 <span class="dt">\</span></span>
-<span id="cb23-60"><a href="#cb23-60"></a>--output_dir <span class="va">$ANNOT_DIR</span>/eggnog <span class="at">-o</span> <span class="va">$STRAIN</span> <span class="at">--override</span> <span class="at">--temp_dir</span> <span class="va">$TMPDIR</span> <span class="dt">\</span></span>
-<span id="cb23-61"><a href="#cb23-61"></a>-i <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa&quot;</span></span>
-<span id="cb23-62"><a href="#cb23-62"></a></span>
-<span id="cb23-63"><a href="#cb23-63"></a><span class="co"># antiSMASH</span></span>
-<span id="cb23-64"><a href="#cb23-64"></a><span class="co"># Estimated run time 30mins</span></span>
-<span id="cb23-65"><a href="#cb23-65"></a><span class="ex">conda</span> activate antismash</span>
-<span id="cb23-66"><a href="#cb23-66"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/antismash</span>
-<span id="cb23-67"><a href="#cb23-67"></a><span class="ex">antismash</span> <span class="at">--taxon</span> fungi <span class="at">--clusterhmmer</span> <span class="at">--tigrfam</span> <span class="at">-c</span> 10 <span class="dt">\</span></span>
-<span id="cb23-68"><a href="#cb23-68"></a>--databases ~/../projects/fisher-local-db/live/antismash <span class="dt">\</span></span>
-<span id="cb23-69"><a href="#cb23-69"></a>--output-dir <span class="va">$ANNOT_DIR</span>/antismash <span class="at">--no-abort-on-invalid-records</span> <span class="at">-d</span> <span class="at">-v</span> <span class="dt">\</span></span>
-<span id="cb23-70"><a href="#cb23-70"></a>--genefinding-tool none <span class="dt">\</span></span>
-<span id="cb23-71"><a href="#cb23-71"></a><span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span></span>
-<span id="cb23-72"><a href="#cb23-72"></a></span>
-<span id="cb23-73"><a href="#cb23-73"></a><span class="co"># Infernal</span></span>
-<span id="cb23-74"><a href="#cb23-74"></a><span class="co"># Estimated run time ~1hr</span></span>
-<span id="cb23-75"><a href="#cb23-75"></a><span class="ex">conda</span> activate infernal</span>
-<span id="cb23-76"><a href="#cb23-76"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/infernal</span>
-<span id="cb23-77"><a href="#cb23-77"></a><span class="ex">cmscan</span> <span class="at">--rfam</span> <span class="at">-E</span> 0.001 <span class="at">--tblout</span> <span class="va">$ANNOT_DIR</span>/infernal/<span class="va">$STRAIN</span>.cmscan <span class="at">--fmt</span> 1 <span class="at">--cpu</span> 10 <span class="dt">\</span></span>
-<span id="cb23-78"><a href="#cb23-78"></a>~/../projects/fisher-local-db/live/rfam-15.1/Rfam.cm <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span></span>
-<span id="cb23-79"><a href="#cb23-79"></a><span class="co"># dbCAN database is currently down for maintenance and is not possible to run</span></span>
-<span id="cb23-80"><a href="#cb23-80"></a></span>
-<span id="cb23-81"><a href="#cb23-81"></a><span class="co"># Combine annotations (except Infernal)</span></span>
-<span id="cb23-82"><a href="#cb23-82"></a><span class="ex">conda</span> activate funannotate</span>
-<span id="cb23-83"><a href="#cb23-83"></a><span class="ex">funannotate</span> annotate <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/funannotate/predict_results <span class="at">-d</span> <span class="va">$FUNANNOTATE_DB</span> <span class="dt">\</span></span>
-<span id="cb23-84"><a href="#cb23-84"></a>-o <span class="va">$ANNOT_DIR</span>/funannotate <span class="at">--fasta</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span> <span class="at">--species</span> <span class="st">&quot;Aspergillus fumigatus&quot;</span> <span class="dt">\</span></span>
-<span id="cb23-85"><a href="#cb23-85"></a>--eggnog <span class="va">$ANNOT_DIR</span>/eggnog/<span class="va">$STRAIN</span>.emapper.annotations <span class="dt">\</span></span>
-<span id="cb23-86"><a href="#cb23-86"></a>--antismash <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/antismash/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span> <span class="dt">\</span></span>
-<span id="cb23-87"><a href="#cb23-87"></a>--iprscan <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/interproscan/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa.xml&quot;</span> <span class="dt">\</span></span>
-<span id="cb23-88"><a href="#cb23-88"></a>--busco_db <span class="va">$BUSCO_DB</span> <span class="dt">\</span></span>
-<span id="cb23-89"><a href="#cb23-89"></a>--cpus 10 <span class="at">--tmpdir</span> <span class="va">$TMPDIR</span></span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb25-2"><a href="#cb25-2"></a><span class="co">#PBS -l walltime=08:00:00</span></span>
+<span id="cb25-3"><a href="#cb25-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=100gb</span></span>
+<span id="cb25-4"><a href="#cb25-4"></a><span class="co">#PBS -N zPredict</span></span>
+<span id="cb25-5"><a href="#cb25-5"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-6"><a href="#cb25-6"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb25-7"><a href="#cb25-7"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-8"><a href="#cb25-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb25-9"><a href="#cb25-9"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-10"><a href="#cb25-10"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb25-11"><a href="#cb25-11"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-12"><a href="#cb25-12"></a><span class="va">GENOME</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish/ont.polished.fasta</span>
+<span id="cb25-13"><a href="#cb25-13"></a><span class="va">ANNOT_DIR</span><span class="op">=</span>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/annotation</span>
+<span id="cb25-14"><a href="#cb25-14"></a><span class="va">FUNANNOTATE_DB</span><span class="op">=</span>~/../projects/fisher-local-db/live/funannotate_db</span>
+<span id="cb25-15"><a href="#cb25-15"></a><span class="va">BUSCO_DB</span><span class="op">=</span>~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10</span>
+<span id="cb25-16"><a href="#cb25-16"></a><span class="va">GENEMARK_PATH</span><span class="op">=</span>~/../projects/fisher-local-software/live/genemark/gmes_linux_64_4</span>
+<span id="cb25-17"><a href="#cb25-17"></a><span class="va">STRAIN</span><span class="op">=</span>demo</span>
+<span id="cb25-18"><a href="#cb25-18"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-19"><a href="#cb25-19"></a><span class="co"># 3. Sort and clean contig names</span></span>
+<span id="cb25-20"><a href="#cb25-20"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-21"><a href="#cb25-21"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
+<span id="cb25-22"><a href="#cb25-22"></a></span>
+<span id="cb25-23"><a href="#cb25-23"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span></span>
+<span id="cb25-24"><a href="#cb25-24"></a><span class="va">BASE</span><span class="op">=</span><span class="va">$(</span><span class="fu">basename</span> <span class="va">$GENOME)</span></span>
+<span id="cb25-25"><a href="#cb25-25"></a><span class="ex">conda</span> activate asm-qc</span>
+<span id="cb25-26"><a href="#cb25-26"></a><span class="ex">seqkit</span> sort <span class="at">-l</span> <span class="at">-r</span> <span class="va">$GENOME</span> <span class="kw">|</span> <span class="fu">sed</span> <span class="st">&#39;s/&gt;.*/&gt;scaffold/g&#39;</span> <span class="kw">|</span> <span class="ex">seqkit</span> rename <span class="kw">|</span> <span class="fu">sed</span> <span class="st">&#39;s/&gt;scaffold$/&gt;scaffold_1/g&#39;</span>  <span class="op">&gt;</span> <span class="va">$ANNOT_DIR</span>/sorted.<span class="va">$BASE</span></span>
+<span id="cb25-27"><a href="#cb25-27"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-28"><a href="#cb25-28"></a><span class="co"># 4. Mask repetitive regions</span></span>
+<span id="cb25-29"><a href="#cb25-29"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-30"><a href="#cb25-30"></a><span class="ex">conda</span> activate funannotate</span>
+<span id="cb25-31"><a href="#cb25-31"></a><span class="ex">funannotate</span> mask <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/sorted.<span class="va">$BASE</span> <span class="at">--cpus</span> 10 <span class="at">-o</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span></span>
+<span id="cb25-32"><a href="#cb25-32"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-33"><a href="#cb25-33"></a><span class="co"># 5. Predict genes</span></span>
+<span id="cb25-34"><a href="#cb25-34"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-35"><a href="#cb25-35"></a><span class="co"># As we don&#39;t have corresponding RNA-seq data we will use a pre-trained database</span></span>
+<span id="cb25-36"><a href="#cb25-36"></a><span class="co"># Estimated run time ~2hr45mins</span></span>
+<span id="cb25-37"><a href="#cb25-37"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/funannotate</span>
+<span id="cb25-38"><a href="#cb25-38"></a><span class="bu">export</span> <span class="va">FUNANNOTATE_DB</span><span class="op">=</span><span class="va">$FUNANNOTATE_DB</span></span>
+<span id="cb25-39"><a href="#cb25-39"></a><span class="bu">export</span> <span class="va">GENEMARK_PATH</span><span class="op">=</span><span class="va">$GENEMARK_PATH</span></span>
+<span id="cb25-40"><a href="#cb25-40"></a><span class="ex">funannotate</span> predict <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span> <span class="at">-d</span> <span class="va">$FUNANNOTATE_DB</span> <span class="at">-o</span> <span class="va">$ANNOT_DIR</span>/funannotate <span class="at">--species</span> <span class="st">&quot;Aspergillus fumigatus&quot;</span> <span class="dt">\</span></span>
+<span id="cb25-41"><a href="#cb25-41"></a>--strain <span class="va">$STRAIN</span> <span class="at">--busco_seed_species</span> aspergillus_fumigatus <span class="at">--cpus</span> 10 <span class="at">--busco_db</span> <span class="va">$BUSCO_DB</span> <span class="at">--tmpdir</span> <span class="va">$TMPDIR</span></span>
+<span id="cb25-42"><a href="#cb25-42"></a></span>
+<span id="cb25-43"><a href="#cb25-43"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-44"><a href="#cb25-44"></a><span class="co"># 6. Functional annotation</span></span>
+<span id="cb25-45"><a href="#cb25-45"></a><span class="co"># Estimated run time ~4hrs</span></span>
+<span id="cb25-46"><a href="#cb25-46"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb25-47"><a href="#cb25-47"></a><span class="co"># InterProScan5</span></span>
+<span id="cb25-48"><a href="#cb25-48"></a><span class="co"># Estimated run time 20mins</span></span>
+<span id="cb25-49"><a href="#cb25-49"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/interproscan</span>
+<span id="cb25-50"><a href="#cb25-50"></a><span class="ex">~/../projects/fisher-local-software/live/interproscan-5.67-99.0/interproscan.sh</span> <span class="at">-appl</span> Pfam <span class="at">--iprlookup</span> <span class="at">-cpu</span> 10 <span class="dt">\</span></span>
+<span id="cb25-51"><a href="#cb25-51"></a>-d <span class="va">$ANNOT_DIR</span>/interproscan <span class="at">--goterms</span> <span class="at">-i</span> <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa&quot;</span></span>
+<span id="cb25-52"><a href="#cb25-52"></a></span>
+<span id="cb25-53"><a href="#cb25-53"></a><span class="co"># Eggnog</span></span>
+<span id="cb25-54"><a href="#cb25-54"></a><span class="co"># Estimated run time ~2hrs</span></span>
+<span id="cb25-55"><a href="#cb25-55"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/eggnog</span>
+<span id="cb25-56"><a href="#cb25-56"></a><span class="bu">export</span> <span class="va">EGGNOG_DATA_DIR</span><span class="op">=</span>~/../projects/fisher-local-db/live/eggnog_db</span>
+<span id="cb25-57"><a href="#cb25-57"></a><span class="ex">emapper.py</span> <span class="at">--sensmode</span> very-sensitive <span class="at">--tax_scope</span> Fungi <span class="at">--cpu</span> 10 <span class="at">--output_dir</span> <span class="va">$ANNOT_DIR</span>/eggnog <span class="at">-o</span> <span class="va">$STRAIN</span> <span class="dt">\</span></span>
+<span id="cb25-58"><a href="#cb25-58"></a>--override <span class="at">--temp_dir</span> <span class="va">$TMPDIR</span> <span class="at">-i</span> <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa&quot;</span></span>
+<span id="cb25-59"><a href="#cb25-59"></a></span>
+<span id="cb25-60"><a href="#cb25-60"></a><span class="co"># antiSMASH</span></span>
+<span id="cb25-61"><a href="#cb25-61"></a><span class="co"># Estimated run time 30mins</span></span>
+<span id="cb25-62"><a href="#cb25-62"></a><span class="ex">conda</span> activate antismash</span>
+<span id="cb25-63"><a href="#cb25-63"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/antismash</span>
+<span id="cb25-64"><a href="#cb25-64"></a><span class="ex">antismash</span> <span class="at">--taxon</span> fungi <span class="at">--clusterhmmer</span> <span class="at">--tigrfam</span> <span class="at">-c</span> 10 <span class="dt">\</span></span>
+<span id="cb25-65"><a href="#cb25-65"></a>--databases ~/../projects/fisher-local-db/live/antismash <span class="at">--output-dir</span> <span class="va">$ANNOT_DIR</span>/antismash <span class="at">--no-abort-on-invalid-records</span> <span class="at">-d</span> <span class="at">-v</span> <span class="dt">\</span></span>
+<span id="cb25-66"><a href="#cb25-66"></a>--genefinding-tool none <span class="dt">\</span></span>
+<span id="cb25-67"><a href="#cb25-67"></a><span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span></span>
+<span id="cb25-68"><a href="#cb25-68"></a></span>
+<span id="cb25-69"><a href="#cb25-69"></a><span class="co"># Infernal</span></span>
+<span id="cb25-70"><a href="#cb25-70"></a><span class="co"># Estimated run time ~1hr</span></span>
+<span id="cb25-71"><a href="#cb25-71"></a><span class="ex">conda</span> activate infernal</span>
+<span id="cb25-72"><a href="#cb25-72"></a><span class="fu">mkdir</span> <span class="va">$ANNOT_DIR</span>/infernal</span>
+<span id="cb25-73"><a href="#cb25-73"></a><span class="ex">cmscan</span> <span class="at">--rfam</span> <span class="at">-E</span> 0.001 <span class="at">--tblout</span> <span class="va">$ANNOT_DIR</span>/infernal/<span class="va">$STRAIN</span>.cmscan <span class="at">--fmt</span> 1 <span class="at">--cpu</span> 10 <span class="dt">\</span></span>
+<span id="cb25-74"><a href="#cb25-74"></a>~/../projects/fisher-local-db/live/rfam-15.1/Rfam.cm <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/funannotate/predict_results/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span></span>
+<span id="cb25-75"><a href="#cb25-75"></a><span class="ex">~/../projects/fisher-local-software/live/jiffy-infernal-hmmer-scripts/infernal-tblout2gff.pl</span> <span class="at">--cmscan</span> <span class="dt">\</span></span>
+<span id="cb25-76"><a href="#cb25-76"></a><span class="va">$ANNOT_DIR</span>/infernal/<span class="va">$STRAIN</span>.cmscan <span class="op">&gt;</span> <span class="va">$ANNOT_DIR</span>/infernal/<span class="va">$STRAIN</span>.cmscan.gff</span>
+<span id="cb25-77"><a href="#cb25-77"></a></span>
+<span id="cb25-78"><a href="#cb25-78"></a><span class="co"># Combine annotations (except Infernal)</span></span>
+<span id="cb25-79"><a href="#cb25-79"></a><span class="ex">conda</span> activate funannotate</span>
+<span id="cb25-80"><a href="#cb25-80"></a><span class="bu">export</span> <span class="va">FUNANNOTATE_DB</span><span class="op">=</span><span class="va">$FUNANNOTATE_DB</span></span>
+<span id="cb25-81"><a href="#cb25-81"></a><span class="bu">export</span> <span class="va">BUSCO_DB</span><span class="op">=</span>~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10</span>
+<span id="cb25-82"><a href="#cb25-82"></a><span class="ex">funannotate</span> annotate <span class="at">-i</span> <span class="va">$ANNOT_DIR</span>/funannotate/predict_results <span class="at">-d</span> <span class="va">$FUNANNOTATE_DB</span> <span class="dt">\</span></span>
+<span id="cb25-83"><a href="#cb25-83"></a>-o <span class="va">$ANNOT_DIR</span>/funannotate <span class="at">--fasta</span> <span class="va">$ANNOT_DIR</span>/masked.<span class="va">$BASE</span> <span class="at">--species</span> <span class="st">&quot;Aspergillus fumigatus&quot;</span> <span class="dt">\</span></span>
+<span id="cb25-84"><a href="#cb25-84"></a>--eggnog <span class="va">$ANNOT_DIR</span>/eggnog/<span class="va">$STRAIN</span>.emapper.annotations <span class="at">--antismash</span> <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/antismash/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.gbk&quot;</span> <span class="dt">\</span></span>
+<span id="cb25-85"><a href="#cb25-85"></a>--iprscan <span class="st">&quot;</span><span class="va">${ANNOT_DIR}</span><span class="st">/interproscan/Aspergillus_fumigatus_</span><span class="va">${STRAIN}</span><span class="st">.proteins.fa.xml&quot;</span> <span class="at">--busco_db</span> <span class="va">$BUSCO_DB</span> <span class="dt">\</span></span>
+<span id="cb25-86"><a href="#cb25-86"></a>--cpus 10 <span class="at">--tmpdir</span> <span class="va">$TMPDIR</span></span></code></pre></div>
 <p><strong>Line 26</strong> organises the contigs/scaffolds in
 descending order and renames them as scaffold_1,
 scaffold_2…scaffold_N</p>
@@ -2133,56 +2153,166 @@ scaffold_2…scaffold_N</p>
 This helps reduces errors and speed-up performances of annotation tools.
 As a large fraction of the genome is repetitive in eukaryotes, if we
 filter out low-complexity regions we can focus on coding genes.</p>
-<p><strong>Lines 38-43</strong> run basic prediction of genes, mainly
+<p><strong>Lines 38-41</strong> run basic prediction of genes, mainly
 through the use of protein databases. See the Funannotate documentation
 to see the individual tools which comprise this step.</p>
-<p><strong>Lines 51-53</strong> annotate using InterProScan database of
+<p><strong>Lines 50-51</strong> annotate using InterProScan database of
 protein domains</p>
-<p><strong>Lines 59-61</strong> annotate using related orthologs</p>
-<p><strong>Lines 67-71</strong> annotates secondary metabolite gene
+<p><strong>Lines 57-58</strong> annotate using related orthologs</p>
+<p><strong>Lines 64-67</strong> annotates secondary metabolite gene
 clusters</p>
-<p><strong>Lines 77-78</strong> annotates RNA sequences</p>
-<p><strong>Lines 83-89</strong> perform additional annotations and
+<p><strong>Lines 73-75</strong> annotates RNA sequences</p>
+<p><strong>Line 76</strong> converts Infernal output to GFF</p>
+<p><strong>Lines 80-86</strong> perform additional annotations and
 combines results from InterProScan, EggNOG and antiSMASH</p>
 </div>
-<div id="annotating-methylation-sites-from-ont-data" class="section level1">
-<h1>Annotating methylation sites from ONT data</h1>
-<p>Installation:</p>
+<div id="mc-and-5hmc-from-ont" class="section level1">
+<h1>5mC and 5hmC from ONT</h1>
+<p>In this example, we are aiming to identify 5mC methylation sites from
+ONT data. 5mC sites are just one form of epigenetic markers; ONT can
+sequence alternative markers depending on the software which performs
+the base-calling, additional markers can be identified if you adapt the
+code below.</p>
+<p>Installation (non-/FL):</p>
+<pre><code>conda create -n ont-meth bioconda::ont-modkit </code></pre>
+<p>Installation (non-FL):</p>
+<p>Fisher Lab members do not need to carry out these steps</p>
 <pre><code>cd ~/../projects/fisher-local-software/live
 curl &quot;https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-x64.tar.gz&quot; -o dorado-1.3.0-linux-x64.tar.gz
-tar -xzf dorado-1.3.0-linux-x64.tar.gz
-~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado --version
-
-conda create -n ont-meth bioconda::ont-modkit </code></pre>
-<p>Usage: Mapping</p>
-<pre><code>#!/bin/bash
-#PBS -l walltime=04:00:00
-#PBS -l select=1:ncpus=10:mem=80gb
-#PBS -N zMethAlign
-#PBS -J 1-50
-#--------------------------------------------
-# 1. Initialise conda
-#--------------------------------------------
-eval &quot;$(~/anaconda3/bin/conda shell.bash hook)&quot;
-#--------------------------------------------
-# 2. Establish input/output streams
-#--------------------------------------------
-BAM_FILE=$(sed -n &quot;${PBS_ARRAY_INDEX}p&quot; /rds/general/user/hchown/projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/bam_file_list.txt)
-RUN_ID=$(echo &quot;$BAM_FILE&quot; | rev | cut -d&quot;/&quot; -f2 | rev)
-FASTA_DIR=~/../ephemeral/
-BAM_OUTDIR=~/../ephemeral/$RUN_ID/bam
-#--------------------------------------------
-# 3. Align BAM to genome
-#--------------------------------------------
-cd $TMPDIR
-conda activate polish
-mkdir -p $BAM_OUTDIR
-~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado aligner -t 10 $FASTA_DIR/$RUN_ID.ont.polished.fasta $BAM_FILE \
-| samtools sort --threads 10 &gt; $BAM_OUTDIR/$RUN_ID.$PBS_ARRAY_INDEX.aligned_reads.bam
-</code></pre>
-<p>Merging samtools merge -o merged_output.bam input1.bam input2.bam
-input3.bam</p>
-<p>Calling</p>
+tar -xzf dorado-1.3.0-linux-x64.tar.gz</code></pre>
+<p>In this example, we will be using demonstration data generated by an
+MRes student (Peng Zhou) during their time in Fisher Lab. For non-FL
+members please adapt the scripts appropriately.</p>
+<p>Two scripts have been generated to call 5mC sites. The first,
+<code>01_methAlign.job</code>, takes unaligned <code>.bam</code> files
+and aligns these to their respective genome. This is carried out
+independently for each file generated for your ONT sample. The second,
+<code>02_methCall.job</code>, combines these files together, identifies
+5mC and 5hmC sites, filters these based on a minimum percentage of
+modified base calls (75%) and identifies all of the sites, plus those on
+CpG dinucleotides. Much like variant calling, reads are overlapped onto
+eachother, this means that a portion of the reads may contain a modified
+base, whilst others do not, this is due to repetitive nature of DNA and
+the overlaps generated during assembly. This is why we apply an
+additional filter on percentage of modified bases.</p>
+<div id="alignment" class="section level2">
+<h2>Alignment</h2>
+<p>Tools for aligning ONT BAM files:</p>
+<ul>
+<li>Dorado - ONT toolkit
+<ul>
+<li>Version: 1.3.0</li>
+<li><a href="https://github.com/nanoporetech/dorado">GitHub</a></li>
+</ul></li>
+<li>SAMtools, see details above</li>
+</ul>
+<p>Usage:</p>
+<p>Script for aligning BAM files from ONT can be found at:</p>
+<pre><code>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/01_methAlign.job</code></pre>
+<div class="sourceCode" id="cb29"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb29-2"><a href="#cb29-2"></a><span class="co">#PBS -l walltime=04:00:00</span></span>
+<span id="cb29-3"><a href="#cb29-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=80gb</span></span>
+<span id="cb29-4"><a href="#cb29-4"></a><span class="co">#PBS -N zMethAlign</span></span>
+<span id="cb29-5"><a href="#cb29-5"></a><span class="co">#PBS -J 1-50</span></span>
+<span id="cb29-6"><a href="#cb29-6"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-7"><a href="#cb29-7"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb29-8"><a href="#cb29-8"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-9"><a href="#cb29-9"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb29-10"><a href="#cb29-10"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-11"><a href="#cb29-11"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb29-12"><a href="#cb29-12"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-13"><a href="#cb29-13"></a><span class="va">BAM_FILE</span><span class="op">=</span><span class="va">$(</span><span class="fu">sed</span> <span class="at">-n</span> <span class="st">&quot;</span><span class="va">${PBS_ARRAY_INDEX}</span><span class="st">p&quot;</span> /rds/general/user/hchown/projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/bam_file_list.txt<span class="va">)</span></span>
+<span id="cb29-14"><a href="#cb29-14"></a><span class="va">RUN_ID</span><span class="op">=</span><span class="va">$(</span><span class="bu">echo</span> <span class="st">&quot;</span><span class="va">$BAM_FILE</span><span class="st">&quot;</span> <span class="kw">|</span> <span class="fu">rev</span> <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-d</span><span class="st">&quot;/&quot;</span> <span class="at">-f2</span> <span class="kw">|</span> <span class="fu">rev</span><span class="va">)</span></span>
+<span id="cb29-15"><a href="#cb29-15"></a><span class="va">FASTA_DIR</span><span class="op">=</span>~/../ephemeral/</span>
+<span id="cb29-16"><a href="#cb29-16"></a><span class="va">BAM_OUTDIR</span><span class="op">=</span>~/../ephemeral/<span class="va">$RUN_ID</span>/bam</span>
+<span id="cb29-17"><a href="#cb29-17"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-18"><a href="#cb29-18"></a><span class="co"># 3. Align BAM to genome</span></span>
+<span id="cb29-19"><a href="#cb29-19"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb29-20"><a href="#cb29-20"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
+<span id="cb29-21"><a href="#cb29-21"></a><span class="ex">conda</span> activate polish</span>
+<span id="cb29-22"><a href="#cb29-22"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$BAM_OUTDIR</span></span>
+<span id="cb29-23"><a href="#cb29-23"></a><span class="ex">~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado</span> aligner <span class="at">-t</span> 10 <span class="va">$FASTA_DIR</span>/<span class="va">$RUN_ID</span>.ont.polished.fasta <span class="va">$BAM_FILE</span> <span class="dt">\</span></span>
+<span id="cb29-24"><a href="#cb29-24"></a><span class="kw">|</span> <span class="ex">samtools</span> sort <span class="at">--threads</span> 10 <span class="op">&gt;</span> <span class="va">$BAM_OUTDIR</span>/<span class="va">$RUN_ID</span>.<span class="va">$PBS_ARRAY_INDEX</span>.aligned_reads.bam</span></code></pre></div>
+<p><strong>Lines 23-24</strong> align the ONT BAM file to the genome and
+sorts the resulting file</p>
+</div>
+<div id="calling-modifications" class="section level2">
+<h2>Calling modifications</h2>
+<p>Tools for aligning ONT BAM files:</p>
+<ul>
+<li>Modkit - ONT epi-marker caller
+<ul>
+<li>Version: 1.8.17</li>
+<li><a href="https://github.com/nanoporetech/modkit">GitHub</a></li>
+</ul></li>
+<li>SAMtools, see details above</li>
+</ul>
+<p>Usage:</p>
+<p>Script for calling 5hmC and 5mC from aligned BAM files can be found
+at:</p>
+<pre><code>~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/01_methAlign.job</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode numberSource bash numberLines"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb31-2"><a href="#cb31-2"></a><span class="co">#PBS -l walltime=00:20:00</span></span>
+<span id="cb31-3"><a href="#cb31-3"></a><span class="co">#PBS -l select=1:ncpus=10:mem=80gb</span></span>
+<span id="cb31-4"><a href="#cb31-4"></a><span class="co">#PBS -N zMethCall</span></span>
+<span id="cb31-5"><a href="#cb31-5"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-6"><a href="#cb31-6"></a><span class="co"># 1. Initialise conda</span></span>
+<span id="cb31-7"><a href="#cb31-7"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-8"><a href="#cb31-8"></a><span class="bu">eval</span> <span class="st">&quot;</span><span class="va">$(</span><span class="ex">~/anaconda3/bin/conda</span> shell.bash hook<span class="va">)</span><span class="st">&quot;</span></span>
+<span id="cb31-9"><a href="#cb31-9"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-10"><a href="#cb31-10"></a><span class="co"># 2. Establish input/output streams</span></span>
+<span id="cb31-11"><a href="#cb31-11"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-12"><a href="#cb31-12"></a><span class="va">BAM_DIR</span><span class="op">=</span>~/../ephemeral/barcode01/bam</span>
+<span id="cb31-13"><a href="#cb31-13"></a><span class="va">GENOME</span><span class="op">=</span>~/../ephemeral/barcode01.ont.polished.fasta</span>
+<span id="cb31-14"><a href="#cb31-14"></a><span class="va">OUT_DIR</span><span class="op">=</span>~/../ephemeral</span>
+<span id="cb31-15"><a href="#cb31-15"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-16"><a href="#cb31-16"></a><span class="co"># 3. Combine BAM alignments</span></span>
+<span id="cb31-17"><a href="#cb31-17"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-18"><a href="#cb31-18"></a><span class="bu">cd</span> <span class="va">$TMPDIR</span></span>
+<span id="cb31-19"><a href="#cb31-19"></a><span class="ex">conda</span> activate polish</span>
+<span id="cb31-20"><a href="#cb31-20"></a><span class="fu">find</span> <span class="va">$BAM_DIR</span> <span class="at">-name</span> <span class="st">&quot;*.bam&quot;</span> <span class="at">-print0</span> <span class="kw">|</span> <span class="fu">xargs</span> <span class="at">-0</span> samtools merge <span class="at">-@</span> 10 barcode01.merged.bam</span>
+<span id="cb31-21"><a href="#cb31-21"></a><span class="ex">samtools</span> index barcode01.merged.bam</span>
+<span id="cb31-22"><a href="#cb31-22"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-23"><a href="#cb31-23"></a><span class="co"># 4. Sanity check methylation sites</span></span>
+<span id="cb31-24"><a href="#cb31-24"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-25"><a href="#cb31-25"></a><span class="ex">conda</span> activate ont-meth</span>
+<span id="cb31-26"><a href="#cb31-26"></a><span class="ex">modkit</span> modbam summary <span class="at">--filter-threshold</span> 0.79 <span class="at">--no-sampling</span> <span class="at">-t</span> 10 barcode01.merged.bam</span>
+<span id="cb31-27"><a href="#cb31-27"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-28"><a href="#cb31-28"></a><span class="co"># 5. Call methylation sites</span></span>
+<span id="cb31-29"><a href="#cb31-29"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb31-30"><a href="#cb31-30"></a><span class="ex">modkit</span> pileup <span class="dt">\</span></span>
+<span id="cb31-31"><a href="#cb31-31"></a>barcode01.merged.bam <span class="dt">\</span></span>
+<span id="cb31-32"><a href="#cb31-32"></a>barcode01.meth.bed <span class="dt">\</span></span>
+<span id="cb31-33"><a href="#cb31-33"></a>--modified-bases 5mC 5hmC <span class="dt">\</span></span>
+<span id="cb31-34"><a href="#cb31-34"></a>--reference <span class="va">$GENOME</span> <span class="dt">\</span></span>
+<span id="cb31-35"><a href="#cb31-35"></a>--log ~/../ephemeral/modkit.log.txt <span class="dt">\</span></span>
+<span id="cb31-36"><a href="#cb31-36"></a>-t 10 <span class="dt">\</span></span>
+<span id="cb31-37"><a href="#cb31-37"></a>--filter-threshold 0.79</span>
+<span id="cb31-38"><a href="#cb31-38"></a><span class="co"># CpG sites only</span></span>
+<span id="cb31-39"><a href="#cb31-39"></a><span class="ex">modkit</span> pileup <span class="dt">\</span></span>
+<span id="cb31-40"><a href="#cb31-40"></a>barcode01.merged.bam <span class="dt">\</span></span>
+<span id="cb31-41"><a href="#cb31-41"></a>barcode01.meth.cpg.bed <span class="dt">\</span></span>
+<span id="cb31-42"><a href="#cb31-42"></a>--modified-bases 5mC 5hmC <span class="dt">\</span></span>
+<span id="cb31-43"><a href="#cb31-43"></a>--reference <span class="va">$GENOME</span> <span class="dt">\</span></span>
+<span id="cb31-44"><a href="#cb31-44"></a>--log ~/../ephemeral/modkit.log.txt <span class="dt">\</span></span>
+<span id="cb31-45"><a href="#cb31-45"></a>-t 10 <span class="at">--cpg</span> <span class="dt">\</span></span>
+<span id="cb31-46"><a href="#cb31-46"></a>--filter-threshold 0.79</span>
+<span id="cb31-47"><a href="#cb31-47"></a><span class="co">#------------------------------------------</span></span>
+<span id="cb31-48"><a href="#cb31-48"></a><span class="co"># 6. Filter sites</span></span>
+<span id="cb31-49"><a href="#cb31-49"></a><span class="co">#-----------------------------------------</span></span>
+<span id="cb31-50"><a href="#cb31-50"></a><span class="fu">awk</span> <span class="at">-F</span> <span class="st">&#39;\t&#39;</span> <span class="st">&#39;$11 &gt; 75&#39;</span> barcode01.meth.bed <span class="op">&gt;</span> <span class="va">$OUT_DIR</span>/barcode01.filtered.meth.bed</span>
+<span id="cb31-51"><a href="#cb31-51"></a><span class="fu">awk</span> <span class="at">-F</span> <span class="st">&#39;\t&#39;</span> <span class="st">&#39;$11 &gt; 75&#39;</span> barcode01.meth.cpg.bed <span class="op">&gt;</span> <span class="va">$OUT_DIR</span>/barcode01.filtered.meth.cpg.bed</span></code></pre></div>
+<p><strong>Lines 20-21</strong> merge the individual BAM files from a
+barcode and indexes the resulting file</p>
+<p><strong>Line 26</strong> prints out a brief summary of the
+modification profiles</p>
+<p><strong>Lines 30-37</strong> calls 5mC and 5hmC modified bases,
+filter threshold has been set to 0.79</p>
+<p><strong>Lines 39-46</strong> identifies the 5mC and 5hmC sits that
+are on CpG islands</p>
+<p><strong>Lines 50-51</strong> filters the calls so that the modified
+base must appear in more than 75% of the base calls</p>
+</div>
 </div>
 
 
