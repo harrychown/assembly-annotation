@@ -507,7 +507,7 @@ cd $TMPDIR
 mkdir $ANNOT_DIR
 BASE=$(basename $GENOME)
 conda activate asm-qc
-seqkit sort -l -r $GENOME | sed 's/>.*/>scaffold/g' | seqkit rename | sed 's/>scaffold$/>scaffold_1/g'  > $ANNOT_DIR/sorted.$BASE
+seqkit sort -l -r $GENOME | sed 's/>.*/>scaffold/g' | seqkit rename | sed 's/>scaffold$/>scaffold_1/g' | sed 's/>/>'"$STRAIN"'_/g' > $ANNOT_DIR/sorted.$BASE
 #--------------------------------------------
 # 4. Mask repetitive regions
 #--------------------------------------------
