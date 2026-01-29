@@ -1432,40 +1432,45 @@ funannotate annotate -i $ANNOT_DIR/funannotate/predict_results -d $FUNANNOTATE_D
 
 ## Basic TE-annotation
 
+Tools for basic TE annotation:
+
+* EarlGrey - TE annotater
+  + Version: 18.8cc5c
+  + [Paper](https://doi.org/10.1038/nbt.3988) 
+  + [GitHub](https://github.com/soedinglab/mmseqs2)
+
 Installation:
 ```
 conda create -n earlgrey bioconda::earlgrey
 conda activate earlgrey
-
-cd ~/anaconda3/envs/earlgrey/share/RepeatMasker/Libraries/famdb/
-
-# download the partitions you require from Dfam 3.9. We will just pick 0 and 16
-wget https://dfam.org/releases/current/families/FamDB/dfam39_full.0.h5.gz
-wget https://dfam.org/releases/current/families/FamDB/dfam39_full.16.h5.gz
-
-# decompress Dfam 3.9 paritions
-gunzip *.gz
-
-# move up to RepeatMasker main directory
-cd ~/anaconda3/envs/earlgrey/share/RepeatMasker/
-
-# Rerun RepeatMasker configuration
-perl ./configure -libdir ~/anaconda3/envs/earlgrey/share/RepeatMasker/Libraries/     		-trf_prgm ~/anaconda3/envs/earlgrey/bin/trf    -rmblast_dir ~/anaconda3/envs/earlgrey/bin     		-hmmer_dir ~/anaconda3/envs/earlgrey/bin     		-abblast_dir ~/anaconda3/envs/earlgrey/bin     		-crossmatch_dir ~/anaconda3/envs/earlgrey/bin     		-default_search_engine rmblast
+earlGrey --help
+```
+You will then notice a Bash script will be generated for you to install the relevant Dfam partitiions <configure_dfam39.sh>.
+Downloading the full set will cost you a lot of memory so I recommend (for fungi) to only use 0 and 6.
+Therefore, open the file and change this line
+```
+curl -o 'dfam39_full.#1.h5.gz' 'https://dfam.org/releases/current/families/FamDB/dfam39_full.[0-16].h5.gz'
+```
+to:
+```
+curl -o 'dfam39_full.16.h5.gz' 'https://dfam.org/releases/current/families/FamDB/dfam39_full.16.h5.gz'
+curl -o 'dfam39_full.0.h5.gz' 'https://dfam.org/releases/current/families/FamDB/dfam39_full.0.h5.gz'
+```
+Then run, as per:
+```
+bash configure_dfam39.sh
 ```
 Usage:
 
-To generate a pangenome, we use a file containing the realpaths of amino acid FASTA files.
-We highly recommend adding 1-2 reference proteomes so that you can compare against a ground truth (or close enough).
-For FL members, we have a demonstration list of protein paths, however, the user name must be changed respectively.
 
-Script for generating a quick pangenome can be found at:
+Script for annotating TEs can be found at:
 ```
-~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/pangenome.job
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/earlgrey.job
 ```
 
 ```bash {.numberLines}
 #!/bin/bash
-#PBS -l walltime=04:00:00
+#PBS -l walltime=01:30:00
 #PBS -l select=1:ncpus=30:mem=80gb
 #PBS -N zEarlgrey
 #--------------------------------------------
@@ -1482,8 +1487,12 @@ PREFIX=demo
 # 3. Annotate TEs
 #--------------------------------------------
 conda activate earlgrey
-mkdir -p $OUTDIR/$PREFIX
-earlGrey -g $GENOME -t 30 -s Afum-strain -o $OUTDIR/$PREFIX -r eukarya -c yes -d yes -e yes
+mkdir -p $OUTDIR
+cd $TMPDIR
+mkdir earlgrey_raw
+OMP_NUM_THREADS=30
+earlGrey -g $GENOME -t 16 -s $PREFIX -o earlgrey_raw  -r fungi -c yes -d yes -e yes
+cp -r ./earlgrey_raw/${PREFIX}_EarlGrey $OUTDIR
 ```
 
 
