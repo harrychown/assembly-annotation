@@ -11,7 +11,7 @@
 
 <meta name="author" content="Harry Chown" />
 
-<meta name="date" content="2026-01-29" />
+<meta name="date" content="2026-01-30" />
 
 <title>Genome Assembly and Annotation</title>
 
@@ -1553,7 +1553,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Genome Assembly and Annotation</h1>
 <h4 class="author">Harry Chown</h4>
-<h4 class="date">2026-01-29</h4>
+<h4 class="date">2026-01-30</h4>
 
 </div>
 
@@ -3002,9 +3002,9 @@ combines results from InterProScan, EggNOG and antiSMASH</p>
 <ul>
 <li>EarlGrey - TE annotater
 <ul>
-<li>Version: 18.8cc5c</li>
-<li><a href="https://doi.org/10.1038/nbt.3988">Paper</a></li>
-<li><a href="https://github.com/soedinglab/mmseqs2">GitHub</a></li>
+<li>Version: 7.0.1</li>
+<li><a href="https://doi.org/10.1093/molbev/msae068">Paper</a></li>
+<li><a href="https://github.com/TobyBaril/EarlGrey">GitHub</a></li>
 </ul></li>
 </ul>
 <p>Installation:</p>
@@ -3049,6 +3049,10 @@ curl -o &#39;dfam39_full.0.h5.gz&#39; &#39;https://dfam.org/releases/current/fam
 <span id="cb40-22"><a href="#cb40-22"></a><span class="va">OMP_NUM_THREADS</span><span class="op">=</span>30</span>
 <span id="cb40-23"><a href="#cb40-23"></a><span class="ex">earlGrey</span> <span class="at">-g</span> <span class="va">$GENOME</span> <span class="at">-t</span> 16 <span class="at">-s</span> <span class="va">$PREFIX</span> <span class="at">-o</span> earlgrey_raw  <span class="at">-r</span> fungi <span class="at">-c</span> yes <span class="at">-d</span> yes <span class="at">-e</span> yes</span>
 <span id="cb40-24"><a href="#cb40-24"></a><span class="fu">cp</span> <span class="at">-r</span> ./earlgrey_raw/<span class="va">${PREFIX}</span>_EarlGrey <span class="va">$OUTDIR</span></span></code></pre></div>
+<p><strong>Line 23</strong> runs EarlGrey using repeats from Fungi found
+in Dfam database. Options <code>-c</code> clusters redundant TEs,
+<code>-d</code> generates soft-masked genomes at the output and
+<code>-e</code> detects Helitrons.</p>
 </div>
 <div id="identify-rip-sites" class="section level2">
 <h2>Identify RIP-sites</h2>
@@ -3144,84 +3148,86 @@ however, the user name must be changed respectively.</p>
 <span id="cb43-43"><a href="#cb43-43"></a><span class="st">  printf &quot;OG%06d\t%s\n&quot;, seen[$1], $0</span></span>
 <span id="cb43-44"><a href="#cb43-44"></a><span class="st">}</span></span>
 <span id="cb43-45"><a href="#cb43-45"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/clusterRes_cluster.tsv <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-f1,3</span>  <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv</span>
-<span id="cb43-46"><a href="#cb43-46"></a></span>
-<span id="cb43-47"><a href="#cb43-47"></a><span class="fu">awk</span> <span class="st">&#39;{print $2,$1}&#39;</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/gene_cluster.tsv</span>
-<span id="cb43-48"><a href="#cb43-48"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-49"><a href="#cb43-49"></a><span class="co"># 6. Create a matrix with gene IDs</span></span>
+<span id="cb43-46"><a href="#cb43-46"></a><span class="fu">cut</span> <span class="at">-f1</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv <span class="op">&gt;</span> clust.tmp</span>
+<span id="cb43-47"><a href="#cb43-47"></a><span class="fu">cut</span> <span class="at">-f2</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv <span class="op">&gt;</span> gene.tmp</span>
+<span id="cb43-48"><a href="#cb43-48"></a><span class="fu">paste</span> gene.tmp clust.tmp  <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/gene_cluster.tsv</span>
+<span id="cb43-49"><a href="#cb43-49"></a></span>
 <span id="cb43-50"><a href="#cb43-50"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-51"><a href="#cb43-51"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
-<span id="cb43-52"><a href="#cb43-52"></a><span class="st">BEGIN { OFS=&quot;\t&quot; }</span></span>
-<span id="cb43-53"><a href="#cb43-53"></a></span>
-<span id="cb43-54"><a href="#cb43-54"></a><span class="st">{</span></span>
-<span id="cb43-55"><a href="#cb43-55"></a><span class="st">  og = $1</span></span>
-<span id="cb43-56"><a href="#cb43-56"></a><span class="st">  split($2, a, &quot;@&quot;)</span></span>
-<span id="cb43-57"><a href="#cb43-57"></a><span class="st">  strain = a[1]</span></span>
-<span id="cb43-58"><a href="#cb43-58"></a><span class="st">  gene   = a[2]</span></span>
-<span id="cb43-59"><a href="#cb43-59"></a></span>
-<span id="cb43-60"><a href="#cb43-60"></a><span class="st">  strains[strain] = 1</span></span>
-<span id="cb43-61"><a href="#cb43-61"></a><span class="st">  ogs[og] = 1</span></span>
-<span id="cb43-62"><a href="#cb43-62"></a></span>
-<span id="cb43-63"><a href="#cb43-63"></a><span class="st">  key = og SUBSEP strain</span></span>
-<span id="cb43-64"><a href="#cb43-64"></a><span class="st">  if (cell[key] == &quot;&quot;) cell[key] = gene</span></span>
-<span id="cb43-65"><a href="#cb43-65"></a><span class="st">  else                 cell[key] = cell[key] &quot;,&quot; gene</span></span>
-<span id="cb43-66"><a href="#cb43-66"></a><span class="st">}</span></span>
-<span id="cb43-67"><a href="#cb43-67"></a></span>
-<span id="cb43-68"><a href="#cb43-68"></a><span class="st">END {</span></span>
-<span id="cb43-69"><a href="#cb43-69"></a><span class="st">  # sort strains and OGs</span></span>
-<span id="cb43-70"><a href="#cb43-70"></a><span class="st">  nS = asorti(strains, S)</span></span>
-<span id="cb43-71"><a href="#cb43-71"></a><span class="st">  nO = asorti(ogs, O)</span></span>
-<span id="cb43-72"><a href="#cb43-72"></a></span>
-<span id="cb43-73"><a href="#cb43-73"></a><span class="st">  # header</span></span>
-<span id="cb43-74"><a href="#cb43-74"></a><span class="st">  printf &quot;Cluster&quot;</span></span>
-<span id="cb43-75"><a href="#cb43-75"></a><span class="st">  for (i=1; i&lt;=nS; i++) printf OFS S[i]</span></span>
-<span id="cb43-76"><a href="#cb43-76"></a><span class="st">  print &quot;&quot;</span></span>
-<span id="cb43-77"><a href="#cb43-77"></a></span>
-<span id="cb43-78"><a href="#cb43-78"></a><span class="st">  # body</span></span>
-<span id="cb43-79"><a href="#cb43-79"></a><span class="st">  for (i=1; i&lt;=nO; i++) {</span></span>
-<span id="cb43-80"><a href="#cb43-80"></a><span class="st">    og = O[i]</span></span>
-<span id="cb43-81"><a href="#cb43-81"></a><span class="st">    printf &quot;%s&quot;, og</span></span>
-<span id="cb43-82"><a href="#cb43-82"></a><span class="st">    for (j=1; j&lt;=nS; j++) {</span></span>
-<span id="cb43-83"><a href="#cb43-83"></a><span class="st">      strain = S[j]</span></span>
-<span id="cb43-84"><a href="#cb43-84"></a><span class="st">      key = og SUBSEP strain</span></span>
-<span id="cb43-85"><a href="#cb43-85"></a><span class="st">      printf OFS (key in cell ? cell[key] : &quot;&quot;)</span></span>
-<span id="cb43-86"><a href="#cb43-86"></a><span class="st">    }</span></span>
-<span id="cb43-87"><a href="#cb43-87"></a><span class="st">    print &quot;&quot;</span></span>
-<span id="cb43-88"><a href="#cb43-88"></a><span class="st">  }</span></span>
-<span id="cb43-89"><a href="#cb43-89"></a><span class="st">}</span></span>
-<span id="cb43-90"><a href="#cb43-90"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.gene_name.tsv</span>
-<span id="cb43-91"><a href="#cb43-91"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-92"><a href="#cb43-92"></a><span class="co"># 7. Convert to count format</span></span>
+<span id="cb43-51"><a href="#cb43-51"></a><span class="co"># 6. Create a matrix with gene IDs</span></span>
+<span id="cb43-52"><a href="#cb43-52"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb43-53"><a href="#cb43-53"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
+<span id="cb43-54"><a href="#cb43-54"></a><span class="st">BEGIN { OFS=&quot;\t&quot; }</span></span>
+<span id="cb43-55"><a href="#cb43-55"></a></span>
+<span id="cb43-56"><a href="#cb43-56"></a><span class="st">{</span></span>
+<span id="cb43-57"><a href="#cb43-57"></a><span class="st">  og = $1</span></span>
+<span id="cb43-58"><a href="#cb43-58"></a><span class="st">  split($2, a, &quot;@&quot;)</span></span>
+<span id="cb43-59"><a href="#cb43-59"></a><span class="st">  strain = a[1]</span></span>
+<span id="cb43-60"><a href="#cb43-60"></a><span class="st">  gene   = a[2]</span></span>
+<span id="cb43-61"><a href="#cb43-61"></a></span>
+<span id="cb43-62"><a href="#cb43-62"></a><span class="st">  strains[strain] = 1</span></span>
+<span id="cb43-63"><a href="#cb43-63"></a><span class="st">  ogs[og] = 1</span></span>
+<span id="cb43-64"><a href="#cb43-64"></a></span>
+<span id="cb43-65"><a href="#cb43-65"></a><span class="st">  key = og SUBSEP strain</span></span>
+<span id="cb43-66"><a href="#cb43-66"></a><span class="st">  if (cell[key] == &quot;&quot;) cell[key] = gene</span></span>
+<span id="cb43-67"><a href="#cb43-67"></a><span class="st">  else                 cell[key] = cell[key] &quot;,&quot; gene</span></span>
+<span id="cb43-68"><a href="#cb43-68"></a><span class="st">}</span></span>
+<span id="cb43-69"><a href="#cb43-69"></a></span>
+<span id="cb43-70"><a href="#cb43-70"></a><span class="st">END {</span></span>
+<span id="cb43-71"><a href="#cb43-71"></a><span class="st">  # sort strains and OGs</span></span>
+<span id="cb43-72"><a href="#cb43-72"></a><span class="st">  nS = asorti(strains, S)</span></span>
+<span id="cb43-73"><a href="#cb43-73"></a><span class="st">  nO = asorti(ogs, O)</span></span>
+<span id="cb43-74"><a href="#cb43-74"></a></span>
+<span id="cb43-75"><a href="#cb43-75"></a><span class="st">  # header</span></span>
+<span id="cb43-76"><a href="#cb43-76"></a><span class="st">  printf &quot;Cluster&quot;</span></span>
+<span id="cb43-77"><a href="#cb43-77"></a><span class="st">  for (i=1; i&lt;=nS; i++) printf OFS S[i]</span></span>
+<span id="cb43-78"><a href="#cb43-78"></a><span class="st">  print &quot;&quot;</span></span>
+<span id="cb43-79"><a href="#cb43-79"></a></span>
+<span id="cb43-80"><a href="#cb43-80"></a><span class="st">  # body</span></span>
+<span id="cb43-81"><a href="#cb43-81"></a><span class="st">  for (i=1; i&lt;=nO; i++) {</span></span>
+<span id="cb43-82"><a href="#cb43-82"></a><span class="st">    og = O[i]</span></span>
+<span id="cb43-83"><a href="#cb43-83"></a><span class="st">    printf &quot;%s&quot;, og</span></span>
+<span id="cb43-84"><a href="#cb43-84"></a><span class="st">    for (j=1; j&lt;=nS; j++) {</span></span>
+<span id="cb43-85"><a href="#cb43-85"></a><span class="st">      strain = S[j]</span></span>
+<span id="cb43-86"><a href="#cb43-86"></a><span class="st">      key = og SUBSEP strain</span></span>
+<span id="cb43-87"><a href="#cb43-87"></a><span class="st">      printf OFS (key in cell ? cell[key] : &quot;&quot;)</span></span>
+<span id="cb43-88"><a href="#cb43-88"></a><span class="st">    }</span></span>
+<span id="cb43-89"><a href="#cb43-89"></a><span class="st">    print &quot;&quot;</span></span>
+<span id="cb43-90"><a href="#cb43-90"></a><span class="st">  }</span></span>
+<span id="cb43-91"><a href="#cb43-91"></a><span class="st">}</span></span>
+<span id="cb43-92"><a href="#cb43-92"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_gene.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.gene_name.tsv</span>
 <span id="cb43-93"><a href="#cb43-93"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-94"><a href="#cb43-94"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
-<span id="cb43-95"><a href="#cb43-95"></a><span class="st">BEGIN{OFS=&quot;\t&quot;}</span></span>
-<span id="cb43-96"><a href="#cb43-96"></a><span class="st">NR==1 {print; next}</span></span>
-<span id="cb43-97"><a href="#cb43-97"></a><span class="st">{</span></span>
-<span id="cb43-98"><a href="#cb43-98"></a><span class="st">  printf &quot;%s&quot;, $1</span></span>
-<span id="cb43-99"><a href="#cb43-99"></a><span class="st">  for (i=2; i&lt;=NF; i++) {</span></span>
-<span id="cb43-100"><a href="#cb43-100"></a><span class="st">    if ($i==&quot;&quot; ) c=0</span></span>
-<span id="cb43-101"><a href="#cb43-101"></a><span class="st">    else { c = split($i, a, &quot;,&quot;) }   # number of comma-separated genes</span></span>
-<span id="cb43-102"><a href="#cb43-102"></a><span class="st">    printf OFS c</span></span>
-<span id="cb43-103"><a href="#cb43-103"></a><span class="st">  }</span></span>
-<span id="cb43-104"><a href="#cb43-104"></a><span class="st">  print &quot;&quot;</span></span>
-<span id="cb43-105"><a href="#cb43-105"></a><span class="st">}</span></span>
-<span id="cb43-106"><a href="#cb43-106"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_matrix.gene_name.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.count.tsv</span>
-<span id="cb43-107"><a href="#cb43-107"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-108"><a href="#cb43-108"></a><span class="co"># 8. Conver to binary format</span></span>
+<span id="cb43-94"><a href="#cb43-94"></a><span class="co"># 7. Convert to count format</span></span>
+<span id="cb43-95"><a href="#cb43-95"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb43-96"><a href="#cb43-96"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
+<span id="cb43-97"><a href="#cb43-97"></a><span class="st">BEGIN{OFS=&quot;\t&quot;}</span></span>
+<span id="cb43-98"><a href="#cb43-98"></a><span class="st">NR==1 {print; next}</span></span>
+<span id="cb43-99"><a href="#cb43-99"></a><span class="st">{</span></span>
+<span id="cb43-100"><a href="#cb43-100"></a><span class="st">  printf &quot;%s&quot;, $1</span></span>
+<span id="cb43-101"><a href="#cb43-101"></a><span class="st">  for (i=2; i&lt;=NF; i++) {</span></span>
+<span id="cb43-102"><a href="#cb43-102"></a><span class="st">    if ($i==&quot;&quot; ) c=0</span></span>
+<span id="cb43-103"><a href="#cb43-103"></a><span class="st">    else { c = split($i, a, &quot;,&quot;) }   # number of comma-separated genes</span></span>
+<span id="cb43-104"><a href="#cb43-104"></a><span class="st">    printf OFS c</span></span>
+<span id="cb43-105"><a href="#cb43-105"></a><span class="st">  }</span></span>
+<span id="cb43-106"><a href="#cb43-106"></a><span class="st">  print &quot;&quot;</span></span>
+<span id="cb43-107"><a href="#cb43-107"></a><span class="st">}</span></span>
+<span id="cb43-108"><a href="#cb43-108"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_matrix.gene_name.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.count.tsv</span>
 <span id="cb43-109"><a href="#cb43-109"></a><span class="co">#--------------------------------------------</span></span>
-<span id="cb43-110"><a href="#cb43-110"></a><span class="co"># Convert to binary</span></span>
-<span id="cb43-111"><a href="#cb43-111"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
-<span id="cb43-112"><a href="#cb43-112"></a><span class="st">BEGIN{OFS=&quot;\t&quot;}</span></span>
-<span id="cb43-113"><a href="#cb43-113"></a><span class="st">NR==1 {print; next}</span></span>
-<span id="cb43-114"><a href="#cb43-114"></a><span class="st">{</span></span>
-<span id="cb43-115"><a href="#cb43-115"></a><span class="st">  printf &quot;%s&quot;, $1</span></span>
-<span id="cb43-116"><a href="#cb43-116"></a><span class="st">  for (i=2; i&lt;=NF; i++) {</span></span>
-<span id="cb43-117"><a href="#cb43-117"></a><span class="st">    b = ($i+0 &gt; 0) ? 1 : 0</span></span>
-<span id="cb43-118"><a href="#cb43-118"></a><span class="st">    printf OFS b</span></span>
-<span id="cb43-119"><a href="#cb43-119"></a><span class="st">  }</span></span>
-<span id="cb43-120"><a href="#cb43-120"></a><span class="st">  print &quot;&quot;</span></span>
-<span id="cb43-121"><a href="#cb43-121"></a><span class="st">}</span></span>
-<span id="cb43-122"><a href="#cb43-122"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_matrix.count.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.binary.tsv</span>
-<span id="cb43-123"><a href="#cb43-123"></a></span></code></pre></div>
+<span id="cb43-110"><a href="#cb43-110"></a><span class="co"># 8. Conver to binary format</span></span>
+<span id="cb43-111"><a href="#cb43-111"></a><span class="co">#--------------------------------------------</span></span>
+<span id="cb43-112"><a href="#cb43-112"></a><span class="co"># Convert to binary</span></span>
+<span id="cb43-113"><a href="#cb43-113"></a><span class="fu">gawk</span> <span class="at">-F</span><span class="st">&#39;\t&#39;</span> <span class="st">&#39;</span></span>
+<span id="cb43-114"><a href="#cb43-114"></a><span class="st">BEGIN{OFS=&quot;\t&quot;}</span></span>
+<span id="cb43-115"><a href="#cb43-115"></a><span class="st">NR==1 {print; next}</span></span>
+<span id="cb43-116"><a href="#cb43-116"></a><span class="st">{</span></span>
+<span id="cb43-117"><a href="#cb43-117"></a><span class="st">  printf &quot;%s&quot;, $1</span></span>
+<span id="cb43-118"><a href="#cb43-118"></a><span class="st">  for (i=2; i&lt;=NF; i++) {</span></span>
+<span id="cb43-119"><a href="#cb43-119"></a><span class="st">    b = ($i+0 &gt; 0) ? 1 : 0</span></span>
+<span id="cb43-120"><a href="#cb43-120"></a><span class="st">    printf OFS b</span></span>
+<span id="cb43-121"><a href="#cb43-121"></a><span class="st">  }</span></span>
+<span id="cb43-122"><a href="#cb43-122"></a><span class="st">  print &quot;&quot;</span></span>
+<span id="cb43-123"><a href="#cb43-123"></a><span class="st">}</span></span>
+<span id="cb43-124"><a href="#cb43-124"></a><span class="st">&#39;</span> <span class="va">$OUTDIR</span>/cluster_matrix.count.tsv <span class="op">&gt;</span> <span class="va">$OUTDIR</span>/cluster_matrix.binary.tsv</span>
+<span id="cb43-125"><a href="#cb43-125"></a></span></code></pre></div>
 <p><strong>Line 13</strong> supplies a list of peptide file paths</p>
 <p><strong>Line 19</strong> makes a copy of these peptide files in your
 temporary space</p>

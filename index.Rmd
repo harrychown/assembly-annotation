@@ -1435,9 +1435,9 @@ funannotate annotate -i $ANNOT_DIR/funannotate/predict_results -d $FUNANNOTATE_D
 Tools for basic TE annotation:
 
 * EarlGrey - TE annotater
-  + Version: 18.8cc5c
-  + [Paper](https://doi.org/10.1038/nbt.3988) 
-  + [GitHub](https://github.com/soedinglab/mmseqs2)
+  + Version: 7.0.1
+  + [Paper](https://doi.org/10.1093/molbev/msae068) 
+  + [GitHub](https://github.com/TobyBaril/EarlGrey)
 
 Installation:
 ```
@@ -1495,6 +1495,8 @@ earlGrey -g $GENOME -t 16 -s $PREFIX -o earlgrey_raw  -r fungi -c yes -d yes -e 
 cp -r ./earlgrey_raw/${PREFIX}_EarlGrey $OUTDIR
 ```
 
+**Line 23** runs EarlGrey using repeats from Fungi found in Dfam database.
+Options ```-c``` clusters redundant TEs, ```-d``` generates soft-masked genomes at the output and ```-e``` detects Helitrons.
 
 
 
@@ -1593,8 +1595,10 @@ awk '
   printf "OG%06d\t%s\n", seen[$1], $0
 }
 ' $OUTDIR/clusterRes_cluster.tsv | cut -f1,3  > $OUTDIR/cluster_gene.tsv
+cut -f1 $OUTDIR/cluster_gene.tsv > clust.tmp
+cut -f2 $OUTDIR/cluster_gene.tsv > gene.tmp
+paste gene.tmp clust.tmp  > $OUTDIR/gene_cluster.tsv
 
-awk '{print $2,$1}' $OUTDIR/cluster_gene.tsv > $OUTDIR/gene_cluster.tsv
 #--------------------------------------------
 # 6. Create a matrix with gene IDs
 #--------------------------------------------
