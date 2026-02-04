@@ -45,37 +45,56 @@ Long-read sequence data derived from *A. fumigatus* strain CEA10 using ONT under
 We will be using two tools to check the quality of our reads, filter poor quality sequences and trim adapter sequences:
 
 * FastQC - visualise quality
-  + Version: 0.10.0
-  + [GitHub](https://github.com/wdecoster/nanoQC) 
-  + [Paper](https://doi.org/10.1093/bioinformatics/bty149)
+  + Version: 0.12.1
+  + [GitHub](https://github.com/s-andrews/FastQC) 
 * FastP - filter and trim reads
-  + Version: 2.8.0
-  + [GitHub](https://github.com/wdecoster/nanofilt)
-  + [Paper](https://doi.org/10.1093/bioinformatics/bty149) (same as NanoQC)
+  + Version: 1.1.0
+  + [GitHub](https://github.com/OpenGene/fastp)
+  + [Paper](https://doi.org/10.1002/imt2.70078) 
 
 Installation:
 ```
-conda create -n ont-qc bioconda::nanoqc bioconda::porechop bioconda::nanofilt
+conda create -n short-qc bioconda::fastp bioconda::fastqc 
 ```
 Script for short-read QC analysis can be found at:
 ```
-~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_qc.job
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/short_qc.job
 ```
 Usage:
 ```bash {.numberLines}
-conda activate fastqc
-fastqc -o $OUTDIR $R1
-fastqc -o $OUTDIR $R2
-
-# Trimming and quality filtering - fastp
-conda activate fastp
-fastp -i $R1  -I $R2  -o $OUTDIR/${PREFIX}_1.trimmed.fastq.gz  -O $OUTDIR/${PREFIX}_2.trimmed.fastq.gz
-
-
+#!/bin/bash
+#PBS -l walltime=00:40:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zShort_qc
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+R1=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz
+R2=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz
+PREFIX=UU
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data
+#--------------------------------------------
+# 3. Pre-trim QC
+#--------------------------------------------
+cd $TMPDIR
+mkdir -p $OUTDIR/short_read
+conda activate short-qc
+fastqc -o $OUTDIR/short_read $R1
+fastqc -o $OUTDIR/short_read $R2
+#--------------------------------------------
+# 4. Trim
+#--------------------------------------------
+fastp -i $R1  -I $R2  -o $OUTDIR/short_read/${PREFIX}_1.trimmed.fastq.gz  -O $OUTDIR/short_read/${PREFIX}_2.trimmed.fastq.gz
+#--------------------------------------------
+# 5. Post-trim QC
+#--------------------------------------------
 # Re-assess trimmed quality - fastqc
-conda activate fastqc
-fastqc -o $OUTDIR $OUTDIR/${PREFIX}_1.trimmed.fastq.gz 
-fastqc -o $OUTDIR $OUTDIR/${PREFIX}_2.trimmed.fastq.gz
+fastqc -o $OUTDIR/short_read $OUTDIR/short_read/${PREFIX}_1.trimmed.fastq.gz 
+fastqc -o $OUTDIR/short_read $OUTDIR/short_read/${PREFIX}_2.trimmed.fastq.gz
 ```
 
 
@@ -146,48 +165,213 @@ nanoQC -o $QC_DIR/ONT/post_QC $QC_DIR/ONT/SRR28036069.trimmed.fastq
 **Lines 29 and 30** trims using porechop's default settings and filters (NanoFilt) based on average read quality >10 or length <500bp. 
 
 # Removing mitochondrial sequences from short-reads
+
 Mitochondrial sequences can impede the assembly process, therefore you can remove these prior to assembly (alternatively, you can assemble first and then remove).
+
 Tools for mitochondrial sequence extraction:
 
 * GetOrganelle - organelle identification
-  + Version: 2.9.6-b1802
-  + [GitHub](https://github.com/mikolmogorov/Flye/tree/flye) 
-  + [Paper](https://doi.org/10.1038/s41587-019-0072-8)
+  + Version: 1.7.7.1
+  + [GitHub](https://github.com/Kinggerm/GetOrganelle) 
+  + [Paper](https://doi.org/10.1186/s13059-020-02154-5)
+* BEDTools - extract reads from alignment file
+  + Version: 2.31.1
+  + [GitHub](https://github.com/arq5x/bedtools2) 
+  + [Paper](https://doi.org/10.1093/bioinformatics/btq033)
+  
+We will also use tools to align and extract mitochondrial reads.
+The alignment steps follow the polishing instructions below so please see those details if you require further information on the tools (minimap2, SAMtools).
+
   
 Installation:
 ```
-conda create -n flye bioconda::flye
+conda create -n getorganelle bioconda::getorganelle bioconda::bedtools
 ```
-Script for ONT read assembly can be found at:
+If you have not previously ran polishing (see below), you will also need to create this environment:
 ```
-~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/ONT_asm.job
+conda create -n polish bioconda::minimap2 bioconda::samtools
+```
+Script for mitochondrial assembly and read extraction can be found at:
+```
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/mitochondria.job
 ```
 
 Usage:
 ```bash {.numberLines}
+#!/bin/bash
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zMito
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+R1=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/UU_1.trimmed.fastq.gz
+R2=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/UU_2.trimmed.fastq.gz
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read
+MITO_REF=~/../projects/fisher-aspergillus-reference/live/NC_017016.1_mito.fa
+PREFIX=demo
+#--------------------------------------------
+# 2. Generate mitochondria
+#--------------------------------------------
 conda activate getorganelle
 mkdir -p $OUTDIR/mitochondria
 get_organelle_config.py --add fungus_mt
-get_organelle_from_reads.py -1 $OUTDIR/${PREFIX}_1.trimmed.fastq.gz  -2 $OUTDIR/${PREFIX}_2.trimmed.fastq.gz  -t 1 -k 21,45,65,85,105 -o $OUTDIR/mitochondria -F fungus_mt -R 10 -s /rds/general/user/hchown/projects/fisher-aspergillus-reference/live/NC_017016.1_mito.fa --overwrite --reduce-reads-for-coverage inf --max-reads inf
-
-# Read mapping, see polish
-
-
-conda activate samtools
-samtools view -b -f 4 $PREFIX.mit.sorted.bam > $PREFIX.mit.unmapped.bam
-samtools sort -n -o $PREFIX.nucl.qsort.bam $PREFIX.mit.unmapped.bam
+get_organelle_from_reads.py -1 $R1  \
+-2 $R2 \
+-t 1 \
+-k 21,45,65,85,105 \
+-o $OUTDIR/mitochondria \
+-F fungus_mt \
+-R 10 \
+-s $MITO_REF \
+--overwrite \
+--reduce-reads-for-coverage inf \
+--max-reads inf
+#--------------------------------------------
+# 3. Extract mitochondrial/nuclear reads
+#--------------------------------------------
+# Align reads to mitochondrial genome
+conda activate polish
+minimap2 -ax sr tmp.fasta $R1 $R2 | samtools sort -o output.sorted.bam
+samtools index output.sorted.bam
+samtools view -b -f 4 output.sorted.bam > mit.unmapped.bam
+samtools sort -n -o nucl.qsort.bam mit.unmapped.bam
 # Convert to fastq
-conda activate bedtools
-bedtools bamtofastq -i $PREFIX.nucl.qsort.bam -fq "${PREFIX}_1.nuclear.fastq" -fq2 "${PREFIX}_2.nuclear.fastq"
+conda activate getorganelle
+bedtools bamtofastq -i nucl.qsort.bam -fq "${PREFIX}_1.nuclear.fastq" -fq2 "${PREFIX}_2.nuclear.fastq"
 gzip "${PREFIX}_1.nuclear.fastq" "${PREFIX}_2.nuclear.fastq"
-mv *.nuclear.fastq.gz $OUTDIR
+mv *.fastq.gz $OUTDIR
 ```
 
 # Assembly
 
 ## Short-read assembly
 
+We are going to start by generating an initial assembly, using SPAdes.
+The reads we will be using in this example have been labelled as nuclear-derived after generating mitochondrial genomes (see above).
+Then, we will scaffold the resulting contigs/scaffodls against a reference genome.
+This will help improve the order of contigs.
+Since we have short-read data, we will re-map the short reads to the scaffold and try to improve any local misassemblies.
 
+Tools for initial assembly and scaffolding:
+
+* SPAdes - assembler
+  + Version: 4.2.0
+  + [GitHub](https://github.com/Kinggerm/GetOrganelle) 
+  + [Paper](https://doi.org/10.1186/s13059-020-02154-5)
+* AAFTF (sourpurge step) - contamination removal
+  + Version: 0.6.0
+  + [GitHub](https://github.com/Kinggerm/GetOrganelle) 
+  + [Paper](https://doi.org/10.1186/s13059-020-02154-5)
+* Ragtag - scaffolder
+  + Version: 2.1.0
+  + [GitHub](https://github.com/arq5x/bedtools2) 
+  + [Paper](https://doi.org/10.1093/bioinformatics/btq033)
+  
+We will also use tools to align and improve the assembly.
+The alignment and polishing steps follow the polishing instructions below so please see those details if you require further information on the tools (minimap2, SAMtools, Pilon).
+
+  
+Installation:
+```
+conda create -n short-asm -c bioconda "python>=3.6" bbmap trimmomatic bowtie2 bwa pilon sourmash \
+    blast minimap2 spades megahit novoplasty biopython fastp masurca unicycler ragtag
+conda activate short-asm
+python -m pip install git+https://github.com/stajichlab/AAFTF.git
+```
+For FL members, a sourmash database has been preinstalled. 
+For non-FL members you will need to install the appropriate database like so:
+```
+cd ~/../projects/fisher-local-software/live/AAFTF_DB
+wget https://osf.io/4f8n3/download/genbank-k31.lca.json.gz
+```
+If you have not previously ran polishing (see below), you will also need to create this environment:
+```
+conda create -n polish bioconda::minimap2 bioconda::samtools
+```
+We will also be using a local install of Pilon.
+Please see the ONT polishing steps for details on installation of Pilon on your machine.
+
+Script for short-read assembly and refinement can be found at:
+```
+~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/complete/short_asm.job
+```
+
+
+```bash {.numberLines}
+#!/bin/bash
+#PBS -l walltime=10:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zShortASM
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+AAFTF_DB=~/../projects/fisher-local-software/live/AAFTF_DB
+R1=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/demo_1.nuclear.fastq.gz
+R2=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/demo_2.nuclear.fastq.gz
+REF=~/../projects/fisher-aspergillus-reference/live/CEA10.fasta
+PREFIX=demo
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/assembly
+PILON_PATH=~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar
+mkdir $OUTDIR
+#--------------------------------------------
+# 3. Generate initial assembly
+#--------------------------------------------
+# Initial assembly
+conda activate short-asm
+mkdir spades
+spades.py -1 $R1 \
+-2 $R2 \
+-o spades \
+--threads 10 \
+--careful
+#--------------------------------------------
+# 4. Remove contamination
+#--------------------------------------------
+# Check for contamination
+AAFTF_DB=$(echo "$AAFTF_DB" | xargs realpath)
+AAFTF sourpurge -i spades/scaffolds.fasta \
+-p Ascomycota \
+-o scaffolds.cleaned.fasta
+#--------------------------------------------
+# 5. Scaffold
+#--------------------------------------------
+mkdir ragtag
+ragtag.py scaffold $REF scaffolds.cleaned.fasta -u \
+-o ragtag \
+-t 10 \
+-r
+#--------------------------------------------
+# 5. Polish scaffolded assembly
+#--------------------------------------------
+conda activate polish
+cp ragtag/ragtag.scaffold.fasta tmp.fasta
+for i in $(seq 1 5); do
+	mkdir pilon_tmp
+	# Align sequence data to genome
+	minimap2 -ax sr tmp.fasta $R1 $R2 \
+	| samtools sort -o output.sorted.bam
+	samtools index output.sorted.bam
+	# Use pilon to improve genome based on alignment
+	java -Xmx100G -jar $PILON_PATH \
+	--genome tmp.fasta \
+	--bam output.sorted.bam \
+	--outdir pilon_tmp --changes 
+	# Overwrite genome 
+	mv pilon_tmp/pilon.fasta tmp.fasta
+	rm -rf pilon_tmp
+done
+
+cp tmp.fasta $OUTDIR/$PREFIX.polished.scaffolds.fasta
+```
 
 ## Long-read assembly
 
