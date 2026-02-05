@@ -16,7 +16,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction to genome assembly and annotation
 
+## Layout overview
 
+This tutorial is laid out as specific tasks.
+Throughout the tutorial you may notice some dependencies which are from tasks further down the document, this is because the chronology of the tutorial is not the same as how it was made.
+For each task, you will find a short list of the required tools.
+Installation instructions have been provided however, I recommend using the exact Conda environments I generated - as these have already been tested.
+You can find the environment YML files on the GitHub repository <https://github.com/harrychown/assembly-annotation> .
+There you will also find instructions on how to install the Conda environment using the appropriate files.
+
+For each tool used, I provide a one sentence description of its task, the version number and links to the relevant papers/wiki/GitHub page.
+
+I also provide a line-by-line run through of how the script works.
+Take in mind that these have been developed for use on the Imperial College London HPC, therefore, it may not fully transfer to your system.
 
 ## Caveats
 
