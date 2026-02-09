@@ -1,0 +1,52 @@
+#!/bin/bash
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=10:mem=80gb
+#PBS -N zMethCall
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+BAM_DIR=~/../ephemeral/barcode01/bam
+GENOME=~/../ephemeral/barcode01.ont.polished.fasta
+OUT_DIR=~/../ephemeral
+#--------------------------------------------
+# 3. Combine BAM alignments
+#--------------------------------------------
+cd $TMPDIR
+conda activate polish
+find $BAM_DIR -name "*.bam" -print0 | xargs -0 samtools merge -@ 10 barcode01.merged.bam
+samtools index barcode01.merged.bam
+#--------------------------------------------
+# 4. Sanity check methylation sites
+#--------------------------------------------
+conda activate ont-meth
+modkit modbam summary --filter-threshold 0.79 --no-sampling -t 10 barcode01.merged.bam
+#--------------------------------------------
+# 5. Call methylation sites
+#--------------------------------------------
+modkit pileup \
+barcode01.merged.bam \
+barcode01.meth.bed \
+--modified-bases 5mC 5hmC \
+--reference $GENOME \
+--log ~/../ephemeral/modkit.log.txt \
+-t 10 \
+--filter-threshold 0.79
+# CpG sites only
+modkit pileup \
+barcode01.merged.bam \
+barcode01.meth.cpg.bed \
+--modified-bases 5mC 5hmC \
+--reference $GENOME \
+--log ~/../ephemeral/modkit.log.txt \
+-t 10 --cpg \
+--filter-threshold 0.79
+#------------------------------------------
+# 6. Filter sites
+#-----------------------------------------
+awk -F '\t' '$11 > 75' barcode01.meth.bed > $OUT_DIR/barcode01.filtered.meth.bed
+awk -F '\t' '$11 > 75' barcode01.meth.cpg.bed > $OUT_DIR/barcode01.filtered.meth.cpg.bed
+

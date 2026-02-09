@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -l walltime=04:00:00
+#PBS -l select=1:ncpus=10:mem=80gb
+#PBS -N zMethAlign
+#PBS -J 1-50
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+BAM_FILE=$(sed -n "${PBS_ARRAY_INDEX}p" /rds/general/user/hchown/projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/bam_file_list.txt)
+RUN_ID=$(echo "$BAM_FILE" | rev | cut -d"/" -f2 | rev)
+FASTA_DIR=~/../ephemeral/
+BAM_OUTDIR=~/../ephemeral/$RUN_ID/bam
+#--------------------------------------------
+# 3. Align BAM to genome
+#--------------------------------------------
+cd $TMPDIR
+conda activate polish
+mkdir -p $BAM_OUTDIR
+~/../projects/fisher-local-software/live/dorado-1.3.0-linux-x64/bin/dorado aligner -t 10 $FASTA_DIR/$RUN_ID.ont.polished.fasta $BAM_FILE \
+| samtools sort --threads 10 > $BAM_OUTDIR/$RUN_ID.$PBS_ARRAY_INDEX.aligned_reads.bam

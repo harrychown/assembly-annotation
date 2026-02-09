@@ -1,0 +1,128 @@
+#!/bin/bash
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zPangenome
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/pangenome
+LIST_OF_PEP=/rds/general/user/hchown/projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/scripts/protein_list.txt
+#--------------------------------------------
+# 3. Generate a database of peptide sequences
+#--------------------------------------------
+mkdir -p $OUTDIR
+cd $TMPDIR
+cp -t $TMPDIR $(cat $LIST_OF_PEP)
+# Add unique ID to FASTA headers
+for file in *
+do
+	PREFIX=$(basename $file | cut -d"." -f1)
+	sed -i 's/>/>'"$PREFIX"'@/g' $file
+done
+# Combine files
+cat * > total.faa
+#--------------------------------------------
+# 4. Cluster peptides
+#--------------------------------------------
+conda activate mmseqs2
+# Cluster
+mmseqs easy-cluster total.faa $OUTDIR/clusterRes tmp --min-seq-id 0.9 -c 0.9 --cov-mode 1 --threads 10
+#--------------------------------------------
+# 5. Generate simple match tables
+# Cluster - Gene and Gene - Cluster
+#--------------------------------------------
+awk '
+{
+  if (!seen[$1]) {
+    seen[$1] = ++c
+  }
+  printf "OG%06d\t%s\n", seen[$1], $0
+}
+' $OUTDIR/clusterRes_cluster.tsv | cut -f1,3  > $OUTDIR/cluster_gene.tsv
+
+cut -f1 $OUTDIR/cluster_gene.tsv > clust.tmp
+cut -f2 $OUTDIR/cluster_gene.tsv > gene.tmp
+paste gene.tmp clust.tmp  > $OUTDIR/gene_cluster.tsv
+#--------------------------------------------
+# 6. Create a matrix with gene IDs
+#--------------------------------------------
+gawk -F'\t' '
+BEGIN { OFS="\t" }
+
+{
+  og = $1
+  split($2, a, "@")
+  strain = a[1]
+  gene   = a[2]
+
+  strains[strain] = 1
+  ogs[og] = 1
+
+  key = og SUBSEP strain
+  if (cell[key] == "") cell[key] = gene
+  else                 cell[key] = cell[key] "," gene
+}
+
+END {
+  # sort strains and OGs
+  nS = asorti(strains, S)
+  nO = asorti(ogs, O)
+
+  # header
+  printf "Cluster"
+  for (i=1; i<=nS; i++) printf OFS S[i]
+  print ""
+
+  # body
+  for (i=1; i<=nO; i++) {
+    og = O[i]
+    printf "%s", og
+    for (j=1; j<=nS; j++) {
+      strain = S[j]
+      key = og SUBSEP strain
+      printf OFS (key in cell ? cell[key] : "")
+    }
+    print ""
+  }
+}
+' $OUTDIR/cluster_gene.tsv > $OUTDIR/cluster_matrix.gene_name.tsv
+#--------------------------------------------
+# 7. Conver to count format
+#--------------------------------------------
+gawk -F'\t' '
+BEGIN{OFS="\t"}
+NR==1 {print; next}
+{
+  printf "%s", $1
+  for (i=2; i<=NF; i++) {
+    if ($i=="" ) c=0
+    else { c = split($i, a, ",") }   # number of comma-separated genes
+    printf OFS c
+  }
+  print ""
+}
+' $OUTDIR/cluster_matrix.gene_name.tsv > $OUTDIR/cluster_matrix.count.tsv
+#--------------------------------------------
+# 8. Conver to binary format
+#--------------------------------------------
+# Convert to binary
+gawk -F'\t' '
+BEGIN{OFS="\t"}
+NR==1 {print; next}
+{
+  printf "%s", $1
+  for (i=2; i<=NF; i++) {
+    b = ($i+0 > 0) ? 1 : 0
+    printf OFS b
+  }
+  print ""
+}
+' $OUTDIR/cluster_matrix.count.tsv > $OUTDIR/cluster_matrix.binary.tsv
+
+
+
+

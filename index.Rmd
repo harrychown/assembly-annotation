@@ -29,6 +29,7 @@ For each tool used, I provide a one sentence description of its task, the versio
 
 I also provide a line-by-line run through of how the script works.
 Take in mind that these have been developed for use on the Imperial College London HPC, therefore, it may not fully transfer to your system.
+Exact code can be copied here or files can be found on the GitHub page: <https://github.com/harrychown/assembly-annotation/scripts>
 
 ## Caveats
 
@@ -108,7 +109,11 @@ fastp -i $R1  -I $R2  -o $OUTDIR/short_read/${PREFIX}_1.trimmed.fastq.gz  -O $OU
 fastqc -o $OUTDIR/short_read $OUTDIR/short_read/${PREFIX}_1.trimmed.fastq.gz 
 fastqc -o $OUTDIR/short_read $OUTDIR/short_read/${PREFIX}_2.trimmed.fastq.gz
 ```
+**Lines 20-23** assess the quality of pre-trimmed sequences
 
+**Line 27** trims the adapter sequences and removes low-quality reads
+
+**Lines 32-33** re-assess the quality after trimming
 
 ## Long-read QC
 We are going to generate a conda environment called ```ont-qc``` which contains three tools in order to assess the quality of ONT reads, trim and filter. The three tools are:
@@ -226,6 +231,7 @@ R2=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/d
 OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read
 MITO_REF=~/../projects/fisher-aspergillus-reference/live/NC_017016.1_mito.fa
 PREFIX=demo
+cd $TMPDIR
 #--------------------------------------------
 # 2. Generate mitochondria
 #--------------------------------------------
@@ -248,7 +254,7 @@ get_organelle_from_reads.py -1 $R1  \
 #--------------------------------------------
 # Align reads to mitochondrial genome
 conda activate polish
-minimap2 -ax sr tmp.fasta $R1 $R2 | samtools sort -o output.sorted.bam
+minimap2 -ax sr $OUTDIR/mitochondria/fungus_mt.K105.complete.graph1.1.path_sequence.fasta $R1 $R2 | samtools sort -o output.sorted.bam
 samtools index output.sorted.bam
 samtools view -b -f 4 output.sorted.bam > mit.unmapped.bam
 samtools sort -n -o nucl.qsort.bam mit.unmapped.bam
@@ -258,6 +264,10 @@ bedtools bamtofastq -i nucl.qsort.bam -fq "${PREFIX}_1.nuclear.fastq" -fq2 "${PR
 gzip "${PREFIX}_1.nuclear.fastq" "${PREFIX}_2.nuclear.fastq"
 mv *.fastq.gz $OUTDIR
 ```
+**Lines 233-246** assemble mitochondria using a reference for scaffolding
+
+**Lines 252-255** map short-reads to assembly and extracts unmapped (nuclear) alignments
+**Lines 258-260** converts alignment files to FASTQ
 
 # Assembly
 
@@ -334,6 +344,7 @@ PREFIX=demo
 OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/assembly
 PILON_PATH=~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar
 mkdir $OUTDIR
+cd $TMPDIR
 #--------------------------------------------
 # 3. Generate initial assembly
 #--------------------------------------------
@@ -350,6 +361,7 @@ spades.py -1 $R1 \
 #--------------------------------------------
 # Check for contamination
 AAFTF_DB=$(echo "$AAFTF_DB" | xargs realpath)
+export AAFTF_DB=$AAFTF_DB
 AAFTF sourpurge -i spades/scaffolds.fasta \
 -p Ascomycota \
 -o scaffolds.cleaned.fasta
@@ -384,6 +396,14 @@ done
 
 cp tmp.fasta $OUTDIR/$PREFIX.polished.scaffolds.fasta
 ```
+**Lines 25-31** generate an initial assembly which we then improve upon
+
+**Lines 36-40** check contigs for artefacts arising from contamination
+
+**Lines 44-48** scaffolds the contigs against a reference assembly
+
+**Lines 52-68** re-aligns reads to the assembly to help refine the assemby.
+This is carried out 5 times
 
 ## Long-read assembly
 
@@ -1542,7 +1562,7 @@ cd $TMPDIR
 mkdir $ANNOT_DIR
 BASE=$(basename $GENOME)
 conda activate asm-qc
-seqkit sort -l -r $GENOME | sed 's/>.*/>scaffold/g' | seqkit rename | sed 's/>scaffold$/>scaffold_1/g' | sed 's/>/>'"$STRAIN"'_/g' > $ANNOT_DIR/sorted.$BASE
+seqkit sort -l -r $GENOME | sed 's/>.*/>scf/g' | seqkit rename | sed 's/>scf$/>scf_1/g' | sed 's/>/>'"$STRAIN"'_/g' > $ANNOT_DIR/sorted.$BASE
 #--------------------------------------------
 # 4. Mask repetitive regions
 #--------------------------------------------
@@ -1606,7 +1626,7 @@ funannotate annotate -i $ANNOT_DIR/funannotate/predict_results -d $FUNANNOTATE_D
 
 ```
 
-**Line 26** organises the contigs/scaffolds in descending order and renames them as scaffold_1, scaffold_2...scaffold_N
+**Line 26** organises the contigs/scaffolds in descending order and renames them as scf_1, scf_2...scf_N
 
 **Line 31** performs soft-masking of repetitive regions. This helps reduces errors and speed-up performances of annotation tools. As a large fraction of the genome is repetitive in eukaryotes, if we filter out low-complexity regions we can focus on coding genes.
 

@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zPolish
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye/assembly.fasta
+R1=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_1.fastq.gz
+R2=~/../projects/fisher-aspergillus-rawdata/live/tutorial/UU_2.fastq.gz
+POLISH_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish
+
+PILON_PATH=~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar
+#--------------------------------------------
+# 3. Generate polish rounds
+#CPU Time used: 00:41:08
+#CPU Percent: 168%
+#Memory usage: 12210052kb
+#Approx Power usage: 0.008199999999999999
+#Walltime usage: 00:35:53
+#--------------------------------------------
+mkdir $POLISH_DIR
+conda activate polish
+cd $TMPDIR
+cp $GENOME ./tmp.fasta
+for i in $(seq 1 5); do
+	mkdir pilon_tmp
+	# Align sequence data to genome
+	minimap2 -ax sr tmp.fasta $R1 $R2 | samtools sort -o output.sorted.bam
+	samtools index output.sorted.bam
+	# Use pilon to improve genome based on alignment
+	java -Xmx100G -jar $PILON_PATH --genome tmp.fasta --bam output.sorted.bam --outdir pilon_tmp --changes 
+	# Overwrite genome 
+	mv pilon_tmp/pilon.fasta tmp.fasta
+	rm -rf pilon_tmp
+done
+
+cp tmp.fasta $POLISH_DIR/ont.polished.fasta

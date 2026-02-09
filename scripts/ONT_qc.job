@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -l walltime=00:40:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zONT_qc
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+INPUT=~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz
+QC_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data
+#--------------------------------------------
+# 3. QC long-reads
+#CPU Time used: 02:54:36
+#CPU Percent: 975%
+#Memory usage: 6260156kb
+#Approx Power usage: 0.0348
+#Walltime usage: 00:29:40
+#--------------------------------------------
+conda activate ont-qc
+# Initial QC
+cd $TMPDIR
+mkdir -p $QC_DIR/ONT/initial_QC
+nanoQC -o $QC_DIR/ONT/initial_QC $INPUT
+gunzip -c $INPUT > SRR28036069.fastq
+# Read trimming and filtering
+porechop -i SRR28036069.fastq -t 10 --format fastq | NanoFilt -q 10 -l 500  > $QC_DIR/ONT/SRR28036069.trimmed.fastq
+# Post-filter QC
+mkdir -p $QC_DIR/ONT/post_QC
+nanoQC -o $QC_DIR/ONT/post_QC $QC_DIR/ONT/SRR28036069.trimmed.fastq

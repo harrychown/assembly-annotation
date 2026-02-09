@@ -1,0 +1,87 @@
+#!/bin/bash
+#PBS -l walltime=08:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zPredict
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish/ont.polished.fasta
+ANNOT_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/annotation
+FUNANNOTATE_DB=~/../projects/fisher-local-db/live/funannotate_db
+BUSCO_DB=~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10
+GENEMARK_PATH=~/../projects/fisher-local-software/live/genemark/gmes_linux_64_4
+STRAIN=demo
+#--------------------------------------------
+# 3. Sort and clean contig names
+#--------------------------------------------
+cd $TMPDIR
+
+mkdir $ANNOT_DIR
+BASE=$(basename $GENOME)
+conda activate asm-qc
+seqkit sort -l -r $GENOME | sed 's/>.*/>scf/g' | seqkit rename | sed 's/>scf$/>scf_1/g' | sed 's/>/>'"$STRAIN"'_/g' > $ANNOT_DIR/sorted.$BASE
+#--------------------------------------------
+# 4. Mask repetitive regions
+#--------------------------------------------
+conda activate funannotate
+funannotate mask -i $ANNOT_DIR/sorted.$BASE --cpus 10 -o $ANNOT_DIR/masked.$BASE
+#--------------------------------------------
+# 5. Predict genes
+#--------------------------------------------
+# As we don't have corresponding RNA-seq data we will use a pre-trained database
+# Estimated run time ~2hr45mins
+mkdir $ANNOT_DIR/funannotate
+export FUNANNOTATE_DB=$FUNANNOTATE_DB
+export GENEMARK_PATH=$GENEMARK_PATH
+funannotate predict -i $ANNOT_DIR/masked.$BASE -d $FUNANNOTATE_DB -o $ANNOT_DIR/funannotate --species "Aspergillus fumigatus" \
+--strain $STRAIN --busco_seed_species aspergillus_fumigatus --cpus 10 --busco_db $BUSCO_DB --tmpdir $TMPDIR
+
+#--------------------------------------------
+# 6. Functional annotation
+# Estimated run time ~4hrs
+#--------------------------------------------
+# InterProScan5
+# Estimated run time 20mins
+mkdir $ANNOT_DIR/interproscan
+~/../projects/fisher-local-software/live/interproscan-5.67-99.0/interproscan.sh -appl Pfam --iprlookup -cpu 10 \
+-d $ANNOT_DIR/interproscan --goterms -i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
+
+# Eggnog
+# Estimated run time ~2hrs
+mkdir $ANNOT_DIR/eggnog
+export EGGNOG_DATA_DIR=~/../projects/fisher-local-db/live/eggnog_db
+emapper.py --sensmode very-sensitive --tax_scope Fungi --cpu 10 --output_dir $ANNOT_DIR/eggnog -o $STRAIN \
+--override --temp_dir $TMPDIR -i "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.proteins.fa"
+
+# antiSMASH
+# Estimated run time 30mins
+conda activate antismash
+mkdir $ANNOT_DIR/antismash
+antismash --taxon fungi --clusterhmmer --tigrfam -c 10 \
+--databases ~/../projects/fisher-local-db/live/antismash --output-dir $ANNOT_DIR/antismash --no-abort-on-invalid-records -d -v \
+--genefinding-tool none \
+"${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.gbk"
+
+# Infernal
+# Estimated run time ~1hr
+conda activate infernal
+mkdir $ANNOT_DIR/infernal
+cmscan --rfam -E 0.001 --tblout $ANNOT_DIR/infernal/$STRAIN.cmscan --fmt 1 --cpu 10 \
+~/../projects/fisher-local-db/live/rfam-15.1/Rfam.cm "${ANNOT_DIR}/funannotate/predict_results/Aspergillus_fumigatus_${STRAIN}.gbk"
+~/../projects/fisher-local-software/live/jiffy-infernal-hmmer-scripts/infernal-tblout2gff.pl --cmscan \
+$ANNOT_DIR/infernal/$STRAIN.cmscan > $ANNOT_DIR/infernal/$STRAIN.cmscan.gff
+
+# Combine annotations (except Infernal)
+conda activate funannotate
+export FUNANNOTATE_DB=$FUNANNOTATE_DB
+export BUSCO_DB=~/../projects/fisher-local-software/live/busco_downloads/lineages/eurotiales_odb10
+funannotate annotate -i $ANNOT_DIR/funannotate/predict_results -d $FUNANNOTATE_DB \
+-o $ANNOT_DIR/funannotate --fasta $ANNOT_DIR/masked.$BASE --species "Aspergillus fumigatus" \
+--eggnog $ANNOT_DIR/eggnog/$STRAIN.emapper.annotations --antismash "${ANNOT_DIR}/antismash/Aspergillus_fumigatus_${STRAIN}.gbk" \
+--iprscan "${ANNOT_DIR}/interproscan/Aspergillus_fumigatus_${STRAIN}.proteins.fa.xml" --busco_db $BUSCO_DB \
+--cpus 10 --tmpdir $TMPDIR
+

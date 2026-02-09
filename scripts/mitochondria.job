@@ -1,0 +1,48 @@
+#!/bin/bash
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zMito
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+R1=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/UU_1.trimmed.fastq.gz
+R2=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/UU_2.trimmed.fastq.gz
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read
+MITO_REF=~/../projects/fisher-aspergillus-reference/live/NC_017016.1_mito.fa
+PREFIX=demo
+cd $TMPDIR
+#--------------------------------------------
+# 2. Generate mitochondria
+#--------------------------------------------
+conda activate getorganelle
+mkdir -p $OUTDIR/mitochondria
+get_organelle_config.py --add fungus_mt
+get_organelle_from_reads.py -1 $R1  \
+-2 $R2 \
+-t 1 \
+-k 21,45,65,85,105 \
+-o $OUTDIR/mitochondria \
+-F fungus_mt \
+-R 10 \
+-s $MITO_REF \
+--overwrite \
+--reduce-reads-for-coverage inf \
+--max-reads inf
+#--------------------------------------------
+# 3. Extract mitochondrial/nuclear reads
+#--------------------------------------------
+# Align reads to mitochondrial genome
+conda activate polish
+minimap2 -ax sr $OUTDIR/mitochondria/fungus_mt.K105.complete.graph1.1.path_sequence.fasta $R1 $R2 | samtools sort -o output.sorted.bam
+samtools index output.sorted.bam
+samtools view -b -f 4 output.sorted.bam > mit.unmapped.bam
+samtools sort -n -o nucl.qsort.bam mit.unmapped.bam
+# Convert to fastq
+conda activate getorganelle
+bedtools bamtofastq -i nucl.qsort.bam -fq "${PREFIX}_1.nuclear.fastq" -fq2 "${PREFIX}_2.nuclear.fastq"
+gzip "${PREFIX}_1.nuclear.fastq" "${PREFIX}_2.nuclear.fastq"
+mv *.fastq.gz $OUTDIR

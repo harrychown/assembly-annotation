@@ -1,0 +1,26 @@
+#!/bin/bash
+#PBS -l walltime=00:30:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zONT_asm
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+INPUT=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq
+ASM_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/flye
+#--------------------------------------------
+# 3. Assemble ONT reads
+# CPU Time used: 01:32:43
+# CPU Percent: 968%
+# Memory usage: 10680116kb
+# Approx Power usage: 0.0184
+# Walltime usage: 00:14:19
+#--------------------------------------------
+mkdir $ASM_DIR
+conda activate flye
+# Initial assembly
+flye --nano-hq $INPUT -o $ASM_DIR --threads 10
+

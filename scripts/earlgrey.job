@@ -1,0 +1,25 @@
+#!/bin/bash
+#PBS -l walltime=01:30:00
+#PBS -l select=1:ncpus=30:mem=80gb
+#PBS -N zEarlgrey
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/annotation/sorted.ont.polished.fasta
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/annotation/earlgrey
+PREFIX=demo
+#--------------------------------------------
+# 3. Annotate TEs
+#--------------------------------------------
+conda activate earlgrey
+mkdir -p $OUTDIR
+cd $TMPDIR
+mkdir earlgrey_raw
+OMP_NUM_THREADS=30
+earlGrey -g $GENOME -t 16 -s $PREFIX -o earlgrey_raw  -r fungi -c yes -d yes -e yes
+
+cp -r ./earlgrey_raw/${PREFIX}_EarlGrey $OUTDIR

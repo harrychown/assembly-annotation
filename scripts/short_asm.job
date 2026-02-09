@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -l walltime=10:00:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zShortASM
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+AAFTF_DB=~/../projects/fisher-local-software/live/AAFTF_DB
+R1=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/demo_1.nuclear.fastq.gz
+R2=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/demo_2.nuclear.fastq.gz
+REF=~/../projects/fisher-aspergillus-reference/live/CEA10.fasta
+PREFIX=demo
+OUTDIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/short_read/assembly
+PILON_PATH=~/../projects/fisher-local-software/live/pilon/pilon-1.24.jar
+mkdir $OUTDIR
+cd $TMPDIR
+#--------------------------------------------
+# 3. Generate initial assembly
+#--------------------------------------------
+# Initial assembly
+conda activate short-asm
+mkdir spades
+spades.py -1 $R1 \
+-2 $R2 \
+-o spades \
+--threads 10 \
+--careful
+#--------------------------------------------
+# 4. Remove contamination
+#--------------------------------------------
+# Check for contamination
+AAFTF_DB=$(echo "$AAFTF_DB" | xargs realpath)
+export AAFTF_DB=$AAFTF_DB
+AAFTF sourpurge -i spades/scaffolds.fasta \
+-p Ascomycota \
+-o scaffolds.cleaned.fasta
+#--------------------------------------------
+# 5. Scaffold
+#--------------------------------------------
+mkdir ragtag
+ragtag.py scaffold $REF scaffolds.cleaned.fasta -u \
+-o ragtag \
+-t 10 \
+-r
+#--------------------------------------------
+# 5. Polish scaffolded assembly
+#--------------------------------------------
+conda activate polish
+cp ragtag/ragtag.scaffold.fasta tmp.fasta
+for i in $(seq 1 5); do
+	mkdir pilon_tmp
+	# Align sequence data to genome
+	minimap2 -ax sr tmp.fasta $R1 $R2 \
+	| samtools sort -o output.sorted.bam
+	samtools index output.sorted.bam
+	# Use pilon to improve genome based on alignment
+	java -Xmx100G -jar $PILON_PATH \
+	--genome tmp.fasta \
+	--bam output.sorted.bam \
+	--outdir pilon_tmp --changes 
+	# Overwrite genome 
+	mv pilon_tmp/pilon.fasta tmp.fasta
+	rm -rf pilon_tmp
+done
+
+cp tmp.fasta $OUTDIR/$PREFIX.polished.scaffolds.fasta

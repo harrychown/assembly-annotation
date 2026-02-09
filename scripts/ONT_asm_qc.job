@@ -1,0 +1,46 @@
+#!/bin/bash
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=10:mem=100gb
+#PBS -N zAsmQC
+#--------------------------------------------
+# 1. Initialise conda
+#--------------------------------------------
+eval "$(~/anaconda3/bin/conda shell.bash hook)"
+#--------------------------------------------
+# 2. Establish input/output streams
+#--------------------------------------------
+GENOME=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/polish/ont.polished.fasta
+ONT=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/SRR28036069.trimmed.fastq
+BUSCO_DB=~/../projects/fisher-local-software/live/busco_downloads
+ASM_QC_DIR=~/../projects/fisher-aspergillus-analysis/live/tutorial/assembly-annotation/data/ONT/asm_QC
+
+#--------------------------------------------
+# 3. Perform QC on polished assembly
+#--------------------------------------------
+mkdir $ASM_QC_DIR
+conda activate asm-qc
+# Traditional statistics
+seqkit stats -a -N 50,90 $GENOME | sed 's/,//g' > $ASM_QC_DIR/basic_stats.txt
+# Conserved universal orthologs
+cd $TMPDIR
+mkdir busco
+busco -m genome -i $GENOME -o assembly --out_path busco -l eurotiales_odb10 --miniprot --offline --download_path ~/../projects/fisher-local-software/live/busco_downloads -f -c 10
+cp ./busco/assembly/short_summary.specific.eurotiales_odb10.assembly.txt $ASM_QC_DIR/busco.txt
+# Coverage 
+## ONT read mapping
+conda activate polish
+minimap2 -a -x map-ont $GENOME $ONT | samtools sort -T tmp -o output.sorted.bam
+samtools index output.sorted.bam
+## Coverage calc.
+conda activate asm-qc
+mkdir $ASM_QC_DIR/qualimap
+qualimap bamqc -nt 10 -bam output.sorted.bam -outdir $ASM_QC_DIR/qualimap --java-mem-size=80G
+#--------------------------------------------
+# 4. Summarise QC results
+#--------------------------------------------
+#num_seqs sum_len min_len avg_len max_len median GC% N50 N90
+STATS=$(awk '{print $4,$5,$6,$7,$8,$10,$18,$20,$21'} $ASM_QC_DIR/basic_stats.txt | tail -n1 | sed 's/ /,/g')
+#BUSCO Complete	| BUSCO Single |	BUSCO Duplicate	 | BUSCO Fragmented | 	BUSCO Missing	| BUSCO Num Genes
+BUSCO=$(grep "C:" $ASM_QC_DIR/busco.txt | awk '{print $1}' | sed 's/\[/,/g' | sed 's/\]//g' | sed 's/[%|:|Aa-Zz]//g' | cut -d"," -f1-6)
+COV=$(cat $ASM_QC_DIR/qualimap/genome_results.txt | grep "mean coverageData" | cut -d"=" -f2 | sed 's/ //g' | sed 's/X//g')
+echo "${STATS},${COV},${BUSCO}" > $ASM_QC_DIR/overall_stats.csv
