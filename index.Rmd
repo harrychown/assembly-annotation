@@ -51,6 +51,19 @@ Long-read sequence data derived from *A. fumigatus* strain CEA10 using ONT under
 ```
 ~/../projects/fisher-aspergillus-rawdata/live/tutorial/SRR28036069.fastq.gz
 ```
+### Mitochondrial genome
+Mitochondrial genome of *A. fumigatus* strain A1163. Accession: [NC_017016](https://www.ncbi.nlm.nih.gov/nuccore/NC_017016). Members of FisherLab can find data at:
+```
+~/../projects/fisher-aspergillus-reference/live/NC_017016.1_mito.fa
+```
+
+### Reference genome for scaffolding
+The genome that we use for scaffolding is from *A. fumigatus* strain CEA10. Accession: [GCA_051225625.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_051225625.1/).
+Members of FisherLab can find data at:
+```
+~/../projects/fisher-aspergillus-reference/live/CEA10.fasta
+```
+
 # Read quality control (QC)
 
 ## Short-read QC
